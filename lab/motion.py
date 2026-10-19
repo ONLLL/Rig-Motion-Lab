@@ -19,15 +19,17 @@ def angle(a,b): return math.atan2(b[1]-a[1],b[0]-a[0])
 def key_offset(m:Motion,target:str,u:float):
     keys=sorted((k for k in m.keys if k.target==target),key=lambda k:k.phase)
     if not keys: return (0.,0.,0.)
-    values=[(k.phase,(k.dx,k.dy,math.radians(k.angle))) for k in keys]
-    if values[0][0]>0: values.insert(0,(0.,(0.,0.,0.)))
-    if values[-1][0]<1: values.append((1.,(0.,0.,0.)))
+    values=[(k.phase,(k.dx,k.dy,math.radians(k.angle)),k.interpolation) for k in keys]
+    if values[0][0]>0: values.insert(0,(0.,(0.,0.,0.),'smooth'))
+    if values[-1][0]<1: values.append((1.,(0.,0.,0.),'smooth'))
     if u<=values[0][0]: return values[0][1]
-    for (a,va),(b,vb) in zip(values,values[1:]):
+    for (a,va,easing),(b,vb,_) in zip(values,values[1:]):
         if u<=b:
             # Small correction tracks have zero endpoint velocities by design;
             # base attack tracks do NOT stop at every authored key.
-            f=(u-a)/(b-a); f=f*f*(3-2*f)
+            f=(u-a)/(b-a)
+            if easing=='step': f=1. if u==b else 0.
+            elif easing=='smooth': f=f*f*(3-2*f)
             return tuple(mix(x,y,f) for x,y in zip(va,vb))
     return values[-1][1]
 
@@ -66,6 +68,7 @@ def _solve_chain(rig:Rig,points,chain,target,errors):
 def template_frame(rig:Rig,m:Motion,u:float):
     bind=rig.joints; t=u*m.duration; root=bind['pelvis']; root_x=0.
     tilt=0.; dy=0.; feet={}; contacts={}; contact_ids={}
+    hit=m.hit_phase; follow=hit+(1-hit)*.4
     if m.kind=='walk':
         speed=m.stride/(m.stance*m.duration); root_x=speed*t
         dy=-.022+.005*math.cos(4*math.pi*u)
@@ -78,7 +81,7 @@ def template_frame(rig:Rig,m:Motion,u:float):
     elif m.kind=='idle':
         dy=.003*math.sin(2*math.pi*u); tilt=.018*math.sin(2*math.pi*u)*m.amplitude
     elif m.kind=='attack':
-        tilt=math.radians(curve(u,[(0,0),(m.anticipation,14),(.50,-18),(.7,-12),(1,0)]))*m.amplitude
+        tilt=math.radians(curve(u,[(0,0),(m.anticipation,14),(hit,-18),(follow,-12),(1,0)]))*m.amplitude
         dy=-.013*math.sin(math.pi*u)**2
     elif m.kind=='jump':
         if u<.2: dy=-.045*math.sin(math.pi*u/.4)
@@ -104,12 +107,12 @@ def template_frame(rig:Rig,m:Motion,u:float):
         target=vadd(points[side+'_shoulder'],rotate(vec,tilt+swing))
         if m.kind=='attack' and side=='r':
             reach=(math.dist(bind['r_shoulder'],bind['r_elbow'])+math.dist(bind['r_elbow'],bind['r_wrist']))*.92
-            x=curve(u,[(0,.45),(m.anticipation,-.54),(.50,.95),(.7,.70),(1,.45)])
-            y=curve(u,[(0,-.65),(m.anticipation,.58),(.50,-.10),(.7,-.56),(1,-.65)])
+            x=curve(u,[(0,.45),(m.anticipation,-.54),(hit,.95),(follow,.70),(1,.45)])
+            y=curve(u,[(0,-.65),(m.anticipation,.58),(hit,-.10),(follow,-.56),(1,-.65)])
             # Amplitude modifies deviation, not body/limb lengths.
             x=.45+(x-.45)*m.amplitude; y=-.65+(y+.65)*m.amplitude
             target=vadd(points['r_shoulder'],(x*reach,y*reach))
-            weapon_angle=math.radians(curve(u,[(0,65),(m.anticipation,150),(.5,-30),(.7,-68),(1,65)]))
+            weapon_angle=math.radians(curve(u,[(0,65),(m.anticipation,150),(hit,-30),(follow,-68),(1,65)]))
         if m.kind=='jump': target=vadd(target,(0,.07*math.sin(math.pi*u)))
         off=key_offset(m,side+'_wrist',u); target=vadd(target,off[:2]); targets[side+'_wrist']=target
         _solve_chain(rig,points,side+'_arm',target,errors)
@@ -119,6 +122,15 @@ def template_frame(rig:Rig,m:Motion,u:float):
 
 
 def finish_frame(rig,m,u,points,targets,errors,contacts,contact_ids,root_x,weapon_angle):
+    from .editing import apply_fk_offsets
+    # Explicit FK corrections have priority after IK. Report broken contacts rather
+    # than silently undoing the user's authored pose or claiming a successful lock.
+    forearm_before=angle(points['r_elbow'],points['r_wrist'])
+    apply_fk_offsets(points, m, u, key_offset)
+    forearm_after=angle(points['r_elbow'],points['r_wrist'])
+    weapon_angle+=math.atan2(math.sin(forearm_after-forearm_before),math.cos(forearm_after-forearm_before))
+    for chain,(_,_,end) in CHAINS.items():
+        if end in targets: errors[chain]=math.dist(points[end],targets[end])
     points['weapon_tip']=vadd(points['r_wrist'],rotate((rig.weapon_length,0),weapon_angle))
     world_points={k:list(v) for k,v in points.items()}
     if m.root_mode=='in_place':
@@ -161,11 +173,13 @@ def solve_project(p:Project):
             prev_contacts[side]=(cid,pt)
     notes=list(source_notes)
     if not p.rig.approved: notes.append('骨架为待确认标注；当前仍可实验预览，导出前请确认关节。')
-    if max_reach>.002: notes.append('部分手脚目标不可达，已保持骨长并报告误差；请减小幅度、步幅或调整骨盆。')
+    if max_reach>.002: notes.append('部分手脚目标未满足（不可达或被 FK 改写），已保持骨长并报告误差；请调整轨道、幅度或骨盆。')
     if not p.parts: notes.append('尚未绑定角色部件；当前仅可查看骨架，不能导出角色素材。')
+    if any(k.target.startswith('bone:') for k in m.keys):
+        notes.append('已应用手工 FK 角度轨道；它优先于 IK，可能解除手脚接触，请检查误差与姿态。')
     return {'format':'rig-motion-clip.v1','project_revision':p.revision,'rig':p.rig.model_dump(),
         'motion':m.model_dump(),'loop':loop,'duration_ms':sum(f['duration_ms'] for f in frames),
-        'frames':frames,'events':[{'phase':.5,'name':'hit','frame':min(m.frames-1,round(.5*(m.frames-1)))}] if m.kind=='attack' else [],
+        'frames':frames,'events':[{'phase':m.hit_phase,'name':'hit','frame':min(range(len(frames)),key=lambda i:abs(frames[i]['phase']-m.hit_phase))}] if m.kind=='attack' else [],
         'diagnostics':{'max_bone_error':max(f['bone_error'] for f in frames),
             'max_reach_error':max_reach,'max_contact_error':max(contact_errors,default=0),
             'max_stance_step_slip':contact_slip,'warnings':notes,

@@ -74,10 +74,27 @@ class Camera(Strict):
 
 class Key(Strict):
     phase: float = Field(ge=0,le=1)
-    target: Literal['l_wrist','r_wrist','l_ankle','r_ankle','pelvis','weapon']
+    target: str = Field(max_length=64)
+    interpolation: Literal['smooth','linear','step'] = 'smooth'
     dx: float = Field(default=0,ge=-.6,le=.6)
     dy: float = Field(default=0,ge=-.6,le=.6)
     angle: float = Field(default=0,ge=-180,le=180)
+
+    @model_validator(mode='after')
+    def track_target(self):
+        if self.target not in ('l_wrist','r_wrist','l_ankle','r_ankle','pelvis','weapon') and self.target not in tuple('bone:'+b for b in BONES):
+            raise ValueError('未知动作轨道；使用手脚目标、骨盆、武器或标准骨骼角度。')
+        if self.target.startswith('bone:') or self.target == 'weapon':
+            if self.dx or self.dy: raise ValueError('角度轨道不接受 X/Y 偏移。')
+        elif self.angle:
+            raise ValueError('位置轨道不接受角度；请使用骨骼角度轨道。')
+        return self
+
+class LayerKey(Strict):
+    phase: float = Field(ge=0,le=1)
+    part_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,48}$')
+    z: int = Field(ge=-100,le=100)
+    visible: bool
 
 class Motion(Strict):
     kind: Literal['idle','walk','attack','jump','reference'] = 'walk'
@@ -88,9 +105,11 @@ class Motion(Strict):
     stance: float = Field(default=.6,ge=.51,le=.8)
     amplitude: float = Field(default=1,ge=.2,le=1.5)
     anticipation: float = Field(default=.3,ge=.15,le=.4)
+    hit_phase: float = Field(default=.5,ge=.2,le=.9)
     jump_height: float = Field(default=.18,ge=.02,le=.5)
     root_mode: Literal['in_place','world'] = 'in_place'
-    keys: list[Key] = Field(default_factory=list,max_length=48)
+    keys: list[Key] = Field(default_factory=list,max_length=128)
+    layer_keys: list[LayerKey] = Field(default_factory=list,max_length=256)
     reference_gain: float = Field(default=1,ge=.1,le=1.5)
     reference_bind: int = Field(default=0,ge=0,le=239)
     smoothing: Literal[1,3,5] = 3
@@ -99,6 +118,10 @@ class Motion(Strict):
     def key_times(self):
         ids=[(k.phase,k.target) for k in self.keys]
         if len(set(ids))!=len(ids): raise ValueError('同一轨道同一时间只能保留一个校正点。')
+        layer_ids=[(k.phase,k.part_id) for k in self.layer_keys]
+        if len(set(layer_ids))!=len(layer_ids): raise ValueError('同一部件同一时间只能保留一个层级关键帧。')
+        if self.hit_phase <= self.anticipation + .03:
+            raise ValueError('命中时间必须晚于蓄力结束至少 3%。')
         return self
 
 class ReferenceFrame(Strict):
@@ -138,11 +161,20 @@ class Project(Strict):
     reference_placement: tuple[float,float,float,float]|None = None
     camera: Camera = Field(default_factory=Camera)
     motion: Motion = Field(default_factory=Motion)
+    motion_library: dict[str,Motion] = Field(default_factory=dict,max_length=5)
     reference_motion: Reference|None = None
     note: str = Field(default='',max_length=500)
     @model_validator(mode='after')
     def ids(self):
         if len({p.id for p in self.parts})!=len(self.parts): raise ValueError('部件 ID 重复。')
+        for kind,motion in self.motion_library.items():
+            if kind != motion.kind: raise ValueError('动作库键与动作类型不一致。')
+        # The active motion is authoritative. Older v1 projects migrate with defaults.
+        self.motion_library[self.motion.kind] = self.motion.model_copy(deep=True)
+        part_ids={p.id for p in self.parts}
+        for motion in self.motion_library.values():
+            if any(k.part_id not in part_ids for k in motion.layer_keys):
+                raise ValueError('层级关键帧引用了不存在的部件；删除部件时须同步清理轨道。')
         if self.reference_placement and (any(abs(v)>5 for v in self.reference_placement) or min(self.reference_placement[2:])<=0):
             raise ValueError('参考图片位置异常。')
         return self

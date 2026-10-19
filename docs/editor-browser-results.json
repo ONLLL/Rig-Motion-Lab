@@ -1,0 +1,102 @@
+{
+  "mode": "Chromium DOM + real local HTTP bridge (not native browser networking)",
+  "checks": [
+    {
+      "check": "editor loads without JS errors and no desktop overflow",
+      "passed": true
+    },
+    {
+      "check": "joint edit translates shoulder/elbow/wrist together",
+      "passed": true
+    },
+    {
+      "check": "undo restores persisted bind geometry",
+      "passed": true
+    },
+    {
+      "check": "redo reapplies persisted geometry",
+      "passed": true
+    },
+    {
+      "check": "bone length/angle changes keep descendant forearm length",
+      "passed": true
+    },
+    {
+      "check": "FK angle key is saved and solved without changing bone lengths",
+      "passed": true
+    },
+    {
+      "check": "existing key can change time value and interpolation without duplication",
+      "passed": true
+    },
+    {
+      "check": "dragging a timeline diamond moves the key",
+      "passed": true
+    },
+    {
+      "check": "copy key to another sampled frame",
+      "passed": true
+    },
+    {
+      "check": "delete only the selected key",
+      "passed": true
+    },
+    {
+      "check": "walk has its own independent tracks",
+      "passed": true
+    },
+    {
+      "check": "switching back restores idle edits",
+      "passed": true
+    },
+    {
+      "check": "canvas IK handle writes a hand target key",
+      "passed": true
+    },
+    {
+      "check": "canvas FK drag writes bone rotation track",
+      "passed": true
+    },
+    {
+      "check": "send selected part to back changes draw commands",
+      "passed": true
+    },
+    {
+      "check": "bring selected part forward changes draw commands",
+      "passed": true
+    },
+    {
+      "check": "layer visibility affects renderer",
+      "passed": true
+    },
+    {
+      "check": "rename and rebind part while retaining its identity",
+      "passed": true
+    },
+    {
+      "check": "layer animation uses step changes at the authored phase",
+      "passed": true
+    },
+    {
+      "check": "drag-and-drop reorders the base layer list",
+      "passed": true
+    },
+    {
+      "check": "saved project reopens with keys layers and bindings",
+      "passed": true
+    },
+    {
+      "check": "actual PNG export includes edited motion/layer metadata",
+      "passed": true
+    },
+    {
+      "check": "mobile layer ordering remains visible without horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "no browser runtime errors",
+      "passed": true
+    }
+  ],
+  "page_errors": []
+}

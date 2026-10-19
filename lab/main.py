@@ -11,13 +11,13 @@ from PIL import Image,ImageDraw,ImageChops
 from pydantic import ValidationError
 from urllib.parse import urlparse
 from . import storage,video
-from .models import Project,Rig,Part,SaveRequest,BakeRequest,CropRequest,Reference,JOINTS,BONES,LABELS
+from .models import Project,Rig,Part,SaveRequest,BakeRequest,CropRequest,Reference,Motion,JOINTS,BONES,LABELS
 from .demo import new_project,default_rig
 from .motion import solve_project
 from .renderer import prepare_preview,bake
 from .reference import synthetic_reference
 
-app=FastAPI(title='Rig Motion Lab',version='0.1.0')
+app=FastAPI(title='Rig Motion Lab',version='0.2.0')
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['localhost','127.0.0.1','[::1]','testserver'])
 app.mount('/static',StaticFiles(directory=storage.ROOT/'lab/static'),name='static')
 _jobs={};_jobs_lock=threading.Lock();_pool=ThreadPoolExecutor(max_workers=1)
@@ -46,11 +46,11 @@ async def missing(request,exc): return JSONResponse({'detail':str(exc)[:200]},40
 @app.get('/')
 def index(): return FileResponse(storage.ROOT/'lab/static/index.html')
 @app.get('/api/health')
-def health(): return {'ok':True,'version':'0.1.0','image_generation_calls':0}
+def health(): return {'ok':True,'version':'0.2.0','image_generation_calls':0}
 @app.get('/api/config')
 def config():
-    return {'version':'0.1.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
-            'video':video.availability(),'api_keys_required':False,'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
+    return {'version':'0.2.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
+            'video':video.availability(),'api_keys_required':False,'editor_version':2,'motion_default':Motion().model_dump(),'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
 @app.get('/api/projects')
 def projects():
     out=[]
@@ -91,7 +91,10 @@ def reference_image(pid:str,expected_revision:int=Form(...),file:UploadFile=File
     p.reference_placement=(-cx*s,y1*s,im.width*s,im.height*s)
     p.rig=default_rig();p.rig.approved=False
     # Do not retain robot parts under a new user's reference. Originals remain on disk.
-    p.parts=[];p.note='新参考图采用比例模板关节建议，不是识别结果。拖动确认并拆件/上传独立 PNG 后渲染。'
+    p.parts=[]
+    p.motion.layer_keys=[]
+    for motion in p.motion_library.values(): motion.layer_keys=[]
+    p.note='新参考图采用比例模板关节建议，不是识别结果。拖动确认并拆件/上传独立 PNG 后渲染。'
     return storage.public(storage.save(p,expected_revision))
 
 @app.post('/api/projects/{pid}/part-image')
@@ -202,3 +205,13 @@ def import_project(file:UploadFile=File(...)):
         for path,im in images.items():
             out=storage.folder(newid)/path;out.parent.mkdir(parents=True,exist_ok=True);im.save(out,'PNG')
         return storage.public(storage.save(p))
+
+# Structure editing is separate from pose keyframing. Existing save/zip APIs
+# persist both; the same revision lease prevents overwriting a newer project.
+from .editing import RigEdit, edit_rig
+
+@app.post('/api/projects/{pid}/rig/edit')
+def edit_structure(pid:str,body:RigEdit):
+    p=storage.load(pid);check_revision(p,body.expected_revision)
+    p.rig=edit_rig(p.rig,body)
+    return storage.public(storage.save(p,body.expected_revision))

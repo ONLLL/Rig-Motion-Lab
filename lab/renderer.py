@@ -6,6 +6,7 @@ from PIL import Image,ImageDraw
 from .models import BONES,Project,Part
 from .math2d import Affine
 from . import storage
+from .editing import ordered_parts
 BASE_SIZE=768
 
 
@@ -30,7 +31,8 @@ def part_matrix(p:Project,part:Part,frame,image_size,size=BASE_SIZE):
 def assets(p):
     images={};pixels=0
     for part in p.parts:
-        if not part.visible or part.image in images: continue
+        if part.image in images: continue
+        if not part.visible and not any(k.part_id==part.id and k.visible for k in p.motion.layer_keys): continue
         image=storage.image(p.id,part.image);pixels+=image.width*image.height
         if pixels>32*1024*1024: raise ValueError('可见素材累计超过 32M 像素，请缩小原图或隐藏部分素材。')
         images[part.image]=image
@@ -39,8 +41,7 @@ def assets(p):
 
 def draw_commands(p,frame,images,size=BASE_SIZE):
     out=[]
-    for part in sorted(p.parts,key=lambda x:x.z):
-        if not part.visible: continue
+    for part in ordered_parts(p,frame.get('phase',0)):
         im=images[part.image]; mat=part_matrix(p,part,frame,im.size,size)
         out.append({'id':part.id,'image':part.image,'matrix':[mat.a,mat.b,mat.c,mat.d,mat.tx,mat.ty],
                     'size':list(im.size),'bone':part.bone})
@@ -50,8 +51,7 @@ def draw_commands(p,frame,images,size=BASE_SIZE):
 def render_frame(p,frame,size=256,images=None):
     images=assets(p) if images is None else images
     canvas=Image.new('RGBA',(size,size)); clipped=[]
-    for part in sorted(p.parts,key=lambda x:x.z):
-        if not part.visible: continue
+    for part in ordered_parts(p,frame.get('phase',0)):
         im=images[part.image]; mat=part_matrix(p,part,frame,im.size,size); inv=mat.inverse()
         bbox=im.getchannel('A').getbbox()
         if bbox:
@@ -83,7 +83,7 @@ def prepare_preview(p,clip):
 
 def bake(p,clip,size=256,allow_clipping=False):
     if not p.rig.approved: raise ValueError('导出前请在关节页确认骨架。')
-    if not any(part.visible for part in p.parts): raise ValueError('没有绑定可见素材；不能用骨架冒充角色导出。')
+    if not any(ordered_parts(p,f.get('phase',0)) for f in clip['frames']): raise ValueError('没有绑定可见素材；不能用骨架冒充角色导出。')
     images=assets(p); frames=[]; clipped=set()
     for frame in clip['frames']:
         im,bad=render_frame(p,frame,size,images);frames.append(im);clipped.update(bad)
