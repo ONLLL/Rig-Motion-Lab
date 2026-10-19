@@ -1,0 +1,60 @@
+{
+  "method": "Chromium local DOM + Python HTTP bridge; browser native navigation blocked by sandbox policy",
+  "results": [
+    {
+      "check": "initial demo loads rig, 14 fixed parts, 24 solved frames",
+      "passed": true
+    },
+    {
+      "check": "desktop has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "attack template UI persists and solves",
+      "passed": true
+    },
+    {
+      "check": "joint drag updates structure and invalidates approval",
+      "passed": true
+    },
+    {
+      "check": "rig approval can be restored",
+      "passed": true
+    },
+    {
+      "check": "weapon scale and rotation persist without image generation",
+      "passed": true
+    },
+    {
+      "check": "current-frame control-key editing works",
+      "passed": true
+    },
+    {
+      "check": "key removal recomputes clip",
+      "passed": true
+    },
+    {
+      "check": "synthetic reference is distinctly labelled, retargeted with fixed lengths",
+      "passed": true
+    },
+    {
+      "check": "project download creates a restorable ZIP",
+      "passed": true
+    },
+    {
+      "check": "PNG sequence export completes through the UI",
+      "passed": true
+    },
+    {
+      "check": "390px mobile layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "no uncaught browser errors",
+      "passed": true
+    }
+  ],
+  "page_errors": [],
+  "total": 13,
+  "passed": 13
+}

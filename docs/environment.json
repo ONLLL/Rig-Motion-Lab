@@ -1,0 +1,19 @@
+{
+  "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "packages": {
+    "fastapi": "0.128.2",
+    "pydantic": "2.13.5",
+    "uvicorn": "0.48.0",
+    "Pillow": "12.3.0",
+    "numpy": "2.3.5",
+    "mediapipe": "not installed",
+    "opencv-python": "4.13.0.92"
+  },
+  "video": {
+    "mediapipe": false,
+    "opencv": true,
+    "model_present": false,
+    "network_calls": false,
+    "note": "人体检测需单独安装可选依赖和模型；未配置时不会以合成动作冒充视频识别。"
+  }
+}
