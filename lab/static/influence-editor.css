@@ -1,0 +1,19 @@
+/* EDITOR 04: temporal selection reads as a tool, separate from pose values. */
+.influence-box{margin:14px 0;padding:12px;border:1px solid #79895d;border-radius:8px;background:#25362d;min-width:0}
+.influence-heading{display:flex;justify-content:space-between;gap:8px;align-items:center;color:#ffdda0;font-size:12px;margin-bottom:8px}
+.influence-heading span{font-size:9px;letter-spacing:.08em;background:#d5b26b;color:#172723;padding:3px 6px;border-radius:4px}
+#pose-controls .influence-box input[type=range]{padding:0;accent-color:#e2bd73;cursor:pointer}
+.influence-box output{float:right;color:#f7cf84}
+#influence-summary{font-size:11px;line-height:1.7;padding:8px 9px;color:#fae5b8;background:#1b2a27;border-left:3px solid #e9c077;border-radius:3px}
+#influence-summary.invalid{color:#ffb5a4;border-color:#e4957d}
+.influence-box .help{font-size:10px;line-height:1.75;margin:8px 0;color:#b6c7bc}
+#influence-reapply{margin-top:3px;background:#334136;border-color:#7c805b;color:#eed8a8}
+#influence-reapply:disabled{opacity:.35;cursor:default}
+#pose-apply:disabled{cursor:not-allowed}
+.influence-band{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden}
+.influence-band path{fill:#e0af513b;stroke:#d0bc76aa;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.pose-diamond{z-index:1}.pose-playhead{z-index:2}
+.pose-diamond.influence-affected:not(.active){color:#fff0b8;text-shadow:0 0 calc(2px + var(--influence-weight)*5px) #efbc63}
+#pose-controls #influence-range[hidden],#pose-controls #influence-nearby[hidden]{display:none!important}
+#pose-controls .influence-options{gap:8px}
+@media(max-width:680px){.influence-box{padding:11px;margin-top:12px}.influence-heading{font-size:12px}#influence-summary{font-size:11px}.influence-box .help{font-size:10px}}

@@ -17,7 +17,7 @@ from .motion import solve_project
 from .renderer import prepare_preview,bake
 from .reference import synthetic_reference
 
-app=FastAPI(title='Rig Motion Lab',version='0.3.0')
+app=FastAPI(title='Rig Motion Lab',version='0.4.0')
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['localhost','127.0.0.1','[::1]','testserver'])
 app.mount('/static',StaticFiles(directory=storage.ROOT/'lab/static'),name='static')
 _jobs={};_jobs_lock=threading.Lock();_pool=ThreadPoolExecutor(max_workers=1)
@@ -46,11 +46,11 @@ async def missing(request,exc): return JSONResponse({'detail':str(exc)[:200]},40
 @app.get('/')
 def index(): return FileResponse(storage.ROOT/'lab/static/index.html')
 @app.get('/api/health')
-def health(): return {'ok':True,'version':'0.3.0','image_generation_calls':0}
+def health(): return {'ok':True,'version':'0.4.0','image_generation_calls':0}
 @app.get('/api/config')
 def config():
-    return {'version':'0.3.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
-            'video':video.availability(),'api_keys_required':False,'editor_version':3,'motion_default':Motion().model_dump(),'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
+    return {'version':'0.4.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
+            'video':video.availability(),'api_keys_required':False,'editor_version':4,'motion_default':Motion().model_dump(),'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
 @app.get('/api/projects')
 def projects():
     out=[]

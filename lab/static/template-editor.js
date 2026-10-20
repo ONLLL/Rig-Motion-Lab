@@ -84,7 +84,7 @@ function sync(){if(!S.p)return;
  $('pose-target').value=T.target;
  $('pose-link-ends').checked=S.p.motion.link_loop_ends!==false;$('pose-link-ends').disabled=!['idle','walk'].includes(S.p.motion.kind);
  $('pose-count').textContent=(S.p.motion.pose_keys?.length||0)+' 个姿势 · 本地计算';
- if(yes){$('edit-autokey').checked=$('pose-drag-enabled').checked;drawTrack();fillFields(true);}
+ if(yes){$('edit-autokey').checked=$('pose-drag-enabled').checked;drawTrack();fillFields(true);window.influenceEditor?.sync();}
 }
 function opened(){T.selected=null;T.gesture=null;sync();}
 function updateKey(key){
@@ -118,7 +118,7 @@ $('template-convert').onclick=safe(async()=>{S.playing=false;await rigEditor.mut
 $('template-restore').onclick=safe(async()=>{if(!confirm('返回转换前的参数模板？当前姿势编辑会移除；层级编辑保留，可用撤销恢复。'))return;await rigEditor.mutate(async()=>{S.p=await json('/api/projects/'+S.p.id+'/motion/restore',{method:'POST',body:{expected_revision:S.p.revision}});S.previewPhase=null;T.selected=null;});sync();});
 $('pose-target').onchange=()=>{T.target=$('pose-target').value;fillFields(true);if(T.target.startsWith('bone:')){rigEditor.state.bone=T.target.slice(5);S.selectedJoint=S.cfg.bones[T.target.slice(5)][1];}render();};
 $('pose-time').onchange=safe(()=>{const u=num('pose-time')/100;T.selected=S.p.motion.pose_keys.find(k=>near(k.phase,u))?.phase??null;seek(u);drawTrack();});
-$('pose-apply').onclick=safe(async()=>{const k=sample(phase()),value=T.target==='weapon'||T.target.startsWith('bone:')?num('pose-angle'):[num('pose-x'),num('pose-y')];k.interpolation=$('pose-easing').value;await saveKey(editKey(k,T.target,value));});
+$('pose-apply').onclick=safe(async()=>{const k=sample(phase()),value=T.target==='weapon'||T.target.startsWith('bone:')?num('pose-angle'):[num('pose-x'),num('pose-y')];if(window.influenceEditor)return influenceEditor.applyNumeric(T.target,value);k.interpolation=$('pose-easing').value;await saveKey(editKey(k,T.target,value));});
 $('pose-insert').onclick=safe(()=>{const k=sample(phase());k.interpolation=$('pose-easing').value;return saveKey(k);});
 $('pose-save-easing').onclick=safe(()=>rigEditor.mutate(()=>{const k=S.p.motion.pose_keys.find(k=>near(k.phase,T.selected??-1));if(k)k.interpolation=$('pose-easing').value;}));
 $('pose-delete').onclick=safe(()=>rigEditor.mutate(()=>{if(T.selected===0||T.selected===1)throw Error('保留首尾边界姿势。');S.p.motion.pose_keys=S.p.motion.pose_keys.filter(k=>!near(k.phase,T.selected??-1));T.selected=null;}));
@@ -153,21 +153,22 @@ for(const id of ['skeleton','character']){
   }
   T.target=target;$('pose-target').value=target;const w=world(pos),pivot=mode==='fk'?(bone==='weapon'?f.joints.r_wrist:f.joints[S.cfg.bones[bone][0]]):null;
   T.gesture={canvas:id,mode,bone,target,key:k,original:clone(k),start:w,pivot,startAngle:pivot?Math.atan2(w[1]-pivot[1],w[0]-pivot[0]):0,position:mode==='ik'?f.joints[target].slice():null,moved:false};
+  if(window.influenceEditor&&!influenceEditor.beginGesture(T.gesture)){T.gesture=null;return;}
   if(bone&&bone!=='weapon'){rigEditor.state.bone=bone;S.selectedJoint=S.cfg.bones[bone][1];}S.previewPhase=u;canvas.setPointerCapture(e.pointerId);e.preventDefault();render();fillFields(true);
  };
  canvas.onpointermove=e=>{
   const g=T.gesture;if(!g||g.canvas!==id){old.move?.(e);return;}const w=world(mouse(e,canvas));if(Math.hypot(w[0]-g.start[0],w[1]-g.start[1])<.002&&!g.moved)return;g.moved=true;g.key=clone(g.original);
   if(g.mode==='fk'){const a=Math.atan2(w[1]-g.pivot[1],w[0]-g.pivot[0]),delta=deg(Math.atan2(Math.sin(a-g.startAngle),Math.cos(a-g.startAngle)));editKey(g.key,g.target,(g.target==='weapon'?g.original.weapon:g.original.angles[g.bone])+delta);}
   else editKey(g.key,g.target,[g.position[0]+w[0]-g.start[0],g.position[1]+w[1]-g.start[1]]);
-  render();fillFields(true);
+  window.influenceEditor?.previewGesture(g,w);render();fillFields(true);
  };
- canvas.onpointerup=safe(async e=>{const g=T.gesture;if(!g||g.canvas!==id){return old.up?.(e);}T.gesture=null;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);if(g.moved){await saveKey(g.key);toast('已修改模板姿势并保存，未调用图片 API。');}else{render();fillFields(true);}});
+ canvas.onpointerup=safe(async e=>{const g=T.gesture;if(!g||g.canvas!==id){return old.up?.(e);}T.gesture=null;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);if(g.moved){if(window.influenceEditor)await influenceEditor.commitGesture(g);else{await saveKey(g.key);toast('已修改模板姿势并保存，未调用图片 API。');}}else{render();fillFields(true);}});
  canvas.onpointercancel=e=>{if(T.gesture?.canvas===id){T.gesture=null;render();fillFields(true);}else old.cancel?.(e);};
 }
 function afterRender(f){if(!active())return;const line=$('pose-strip').querySelector('.pose-playhead');if(line)line.style.left=f.phase*100+'%';
  $('edit-time').textContent=`${f.time.toFixed(3)}s · ${round(f.phase*100)}% [可编辑]`;
  if(T.gesture){const ctx=$('skeleton').getContext('2d');ctx.save();ctx.fillStyle='#ffd68e';ctx.font='14px sans-serif';ctx.fillText('本地姿势预览 · 松开保存',24,38);ctx.restore();}
- fillFields();}
+ fillFields();window.influenceEditor?.afterRender(f);}
 window.templateEditor={state:T,active,sync,opened,previewFrame,afterRender,sample,frameFromKey,selectKey,seek,editKey,saveKey,relocate};
 if(S.p)opened();
 })();

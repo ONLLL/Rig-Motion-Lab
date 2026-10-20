@@ -1,0 +1,140 @@
+{
+  "method": "Chromium local DOM + Python actual localhost HTTP bridge (native localhost navigation blocked)",
+  "passed": 33,
+  "results": [
+    {
+      "check": "v04 modules and all existing editors load without JS error",
+      "passed": true
+    },
+    {
+      "check": "default editing scope links nearby poses",
+      "passed": true
+    },
+    {
+      "check": "one numeric change affects nine poses instead of just one",
+      "passed": true
+    },
+    {
+      "check": "nearby falloff leaves distant keyframes exactly unchanged",
+      "passed": true
+    },
+    {
+      "check": "one bulk adjustment performs exactly one project write",
+      "passed": true
+    },
+    {
+      "check": "temporal weight band is drawn behind affected diamonds",
+      "passed": true
+    },
+    {
+      "check": "changing influence controls does not change saved project",
+      "passed": true
+    },
+    {
+      "check": "reapply broadens last edit to the whole action without stacking",
+      "passed": true
+    },
+    {
+      "check": "reapply strength uses pre-edit snapshot, not previous result",
+      "passed": true
+    },
+    {
+      "check": "zero-strength reapply restores original poses",
+      "passed": true
+    },
+    {
+      "check": "one undo restores the whole preceding batch",
+      "passed": true
+    },
+    {
+      "check": "one redo restores the whole batch result",
+      "passed": true
+    },
+    {
+      "check": "scope edits preserve bind rig, textures, camera and layer properties",
+      "passed": true
+    },
+    {
+      "check": "explicit 25–75 percent range changes only keys in that interval",
+      "passed": true
+    },
+    {
+      "check": "invalid interval disables apply and displays actionable warning",
+      "passed": true
+    },
+    {
+      "check": "drag previews locally without saving or cumulatively corrupting poses",
+      "passed": true
+    },
+    {
+      "check": "drag plans nearby rather than all motion poses",
+      "passed": true
+    },
+    {
+      "check": "character drag commits exact pre-drag delta result once",
+      "passed": true
+    },
+    {
+      "check": "character selection and silhouette highlight remain linked",
+      "passed": true
+    },
+    {
+      "check": "IK drag applies per-pose endpoint delta across full sequence",
+      "passed": true
+    },
+    {
+      "check": "bulk IK keeps bone lengths and fixed weapon binding",
+      "passed": true
+    },
+    {
+      "check": "cancelled proportional drag leaves motion and revision intact",
+      "passed": true
+    },
+    {
+      "check": "single-pose precision mode still changes only one key",
+      "passed": true
+    },
+    {
+      "check": "loop influence crosses the end seam with equal endpoint delta",
+      "passed": true
+    },
+    {
+      "check": "loop handling preserves root locomotion for all keys",
+      "passed": true
+    },
+    {
+      "check": "switching action keeps independent editable walk in library",
+      "passed": true
+    },
+    {
+      "check": "edited walk reopens with all temporal edits intact",
+      "passed": true
+    },
+    {
+      "check": "reapply guard refuses after intervening project changes",
+      "passed": true
+    },
+    {
+      "check": "saved project archive stores all modified pose keys",
+      "passed": true
+    },
+    {
+      "check": "export contains usable PNG frames and motion after batch editing",
+      "passed": true
+    },
+    {
+      "check": "390px editor has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "mobile numeric all-motion editing changes every key",
+      "passed": true
+    },
+    {
+      "check": "no unhandled browser runtime exceptions",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "image_api_calls": 0
+}
