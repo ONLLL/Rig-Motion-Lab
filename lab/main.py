@@ -17,7 +17,7 @@ from .motion import solve_project
 from .renderer import prepare_preview,bake
 from .reference import synthetic_reference
 
-app=FastAPI(title='Rig Motion Lab',version='0.2.0')
+app=FastAPI(title='Rig Motion Lab',version='0.3.0')
 app.add_middleware(TrustedHostMiddleware,allowed_hosts=['localhost','127.0.0.1','[::1]','testserver'])
 app.mount('/static',StaticFiles(directory=storage.ROOT/'lab/static'),name='static')
 _jobs={};_jobs_lock=threading.Lock();_pool=ThreadPoolExecutor(max_workers=1)
@@ -46,11 +46,11 @@ async def missing(request,exc): return JSONResponse({'detail':str(exc)[:200]},40
 @app.get('/')
 def index(): return FileResponse(storage.ROOT/'lab/static/index.html')
 @app.get('/api/health')
-def health(): return {'ok':True,'version':'0.2.0','image_generation_calls':0}
+def health(): return {'ok':True,'version':'0.3.0','image_generation_calls':0}
 @app.get('/api/config')
 def config():
-    return {'version':'0.2.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
-            'video':video.availability(),'api_keys_required':False,'editor_version':2,'motion_default':Motion().model_dump(),'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
+    return {'version':'0.3.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
+            'video':video.availability(),'api_keys_required':False,'editor_version':3,'motion_default':Motion().model_dump(),'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
 @app.get('/api/projects')
 def projects():
     out=[]
@@ -75,6 +75,30 @@ def asset(pid:str,name:str): return FileResponse(storage.asset_file(pid,'assets/
 @app.post('/api/projects/{pid}/solve')
 def solve(pid:str):
     p=storage.load(pid);return prepare_preview(p,solve_project(p))
+
+
+from .models import Strict
+from pydantic import Field
+class MotionConvertRequest(Strict):
+    expected_revision: int = Field(ge=0)
+
+@app.post('/api/projects/{pid}/motion/convert')
+def convert_template(pid:str,body:MotionConvertRequest):
+    from .poseclip import convert_to_keyframes
+    p=storage.load(pid);check_revision(p,body.expected_revision)
+    if p.motion.driver=='keyframes': raise ValueError('当前动作已经是姿势关键帧。')
+    p.motion=convert_to_keyframes(p)
+    return storage.public(storage.save(p,body.expected_revision))
+
+@app.post('/api/projects/{pid}/motion/restore')
+def restore_template(pid:str,body:MotionConvertRequest):
+    p=storage.load(pid);check_revision(p,body.expected_revision)
+    if p.motion.driver!='keyframes' or not p.motion.source_motion: raise ValueError('没有可恢复的参数模板。')
+    # Keep present draw-order edits; restore the original motion parameters/offsets.
+    layers=p.motion.layer_keys
+    p.motion=Motion.model_validate(p.motion.source_motion)
+    p.motion.layer_keys=layers
+    return storage.public(storage.save(p,body.expected_revision))
 
 
 def checked_image(file): return storage.open_image(file.file.read(8*1024*1024+1))
@@ -128,15 +152,24 @@ def crop(pid:str,body:CropRequest):
     p.note='手工选区拆件不会补齐被遮挡的身体区域；转动后出现空洞需自行补画。'
     return storage.public(storage.save(p,body.expected_revision))
 
+def activate_reference(p):
+    """Keep a keyed walk/attack in its library when replacing reference input."""
+    existing=p.motion if p.motion.kind=='reference' else p.motion_library.get('reference')
+    if existing is not None and existing.driver=='keyframes':
+        raise ValueError('参考动作已转换成关键帧；请先保存工程并返回该动作的参数模板，再导入新轨迹。')
+    p.motion_library[p.motion.kind]=p.motion.model_copy(deep=True)
+    p.motion=existing.model_copy(deep=True) if existing is not None else Motion(kind='reference',duration=p.motion.duration,frames=p.motion.frames,root_mode=p.motion.root_mode)
+    p.motion.reference_bind=0
+
 @app.post('/api/projects/{pid}/reference-example')
 def reference_example(pid:str,expected_revision:int=Form(...)):
-    p=storage.load(pid);check_revision(p,expected_revision);p.reference_motion=synthetic_reference();p.motion.kind='reference';p.motion.reference_bind=0
+    p=storage.load(pid);check_revision(p,expected_revision);activate_reference(p);p.reference_motion=synthetic_reference()
     return storage.public(storage.save(p,expected_revision))
 @app.post('/api/projects/{pid}/reference-motion')
 def reference_motion(pid:str,expected_revision:int=Form(...),file:UploadFile=File(...)):
     p=storage.load(pid);check_revision(p,expected_revision);data=file.file.read(4*1024*1024+1)
     if len(data)>4*1024*1024: raise ValueError('轨迹 JSON 不得超过 4 MB。')
-    ref=Reference.model_validate_json(data);p.reference_motion=ref;p.motion.kind='reference';p.motion.reference_bind=0
+    ref=Reference.model_validate_json(data);activate_reference(p);p.reference_motion=ref
     return storage.public(storage.save(p,expected_revision))
 
 @app.post('/api/projects/{pid}/video')
@@ -158,7 +191,7 @@ def upload_video(pid:str,expected_revision:int=Form(...),file:UploadFile=File(..
             (storage.folder(pid)/(jid+'-observations.json')).write_text(json.dumps(audit,ensure_ascii=False),encoding='utf-8')
             (storage.folder(pid)/(jid+'-reference.json')).write_text(ref.model_dump_json(indent=2),encoding='utf-8')
             current=storage.load(pid);check_revision(current,expected_revision)
-            current.reference_motion=ref;current.motion.kind='reference';current.motion.reference_bind=0
+            activate_reference(current);current.reference_motion=ref
             storage.save(current,expected_revision);_jobs[jid].update(status='complete',progress=1)
         except (ValueError,OSError) as e: _jobs[jid].update(status='failed',error=str(e)[:700])
         except Exception:

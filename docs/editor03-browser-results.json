@@ -1,0 +1,162 @@
+{
+  "mode": "Chromium DOM + Python real local HTTP bridge (not native browser networking)",
+  "checks": [
+    {
+      "check": "editor03 starts without errors or horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "conversion creates editable source poses, not offset tracks",
+      "passed": true
+    },
+    {
+      "check": "conversion preserves original rendered sample geometry",
+      "passed": true
+    },
+    {
+      "check": "template parameters freeze while playback timing remains editable",
+      "passed": true
+    },
+    {
+      "check": "clicking source key seeks exact phase",
+      "passed": true
+    },
+    {
+      "check": "absolute local head angle replaces template pose",
+      "passed": true
+    },
+    {
+      "check": "outgoing interpolation edits persist",
+      "passed": true
+    },
+    {
+      "check": "key can move to non-sampled exact time without snapping",
+      "passed": true
+    },
+    {
+      "check": "dragging a primary-pose diamond moves its actual key",
+      "passed": true
+    },
+    {
+      "check": "duplicate destination refuses overwrite and preserves every key",
+      "passed": true
+    },
+    {
+      "check": "copy preserves complete pose and adds one key",
+      "passed": true
+    },
+    {
+      "check": "delete removes only selected non-boundary pose",
+      "passed": true
+    },
+    {
+      "check": "insert snapshots interpolated pose at arbitrary time",
+      "passed": true
+    },
+    {
+      "check": "live browser interpolation matches backend FK including exact closure",
+      "passed": true
+    },
+    {
+      "check": "rendered-part drag previews locally before any save",
+      "passed": true
+    },
+    {
+      "check": "releasing character FK drag persists only current source pose",
+      "passed": true
+    },
+    {
+      "check": "undo restores pose content on server",
+      "passed": true
+    },
+    {
+      "check": "redo reapplies pose edit",
+      "passed": true
+    },
+    {
+      "check": "skeleton IK dragging writes full pose and preserves bone lengths",
+      "passed": true
+    },
+    {
+      "check": "boundary key cannot be deleted or moved",
+      "passed": true
+    },
+    {
+      "check": "linked loop endpoints update matching local pose angles",
+      "passed": true
+    },
+    {
+      "check": "list selection highlights actual rendered silhouette without saving",
+      "passed": true
+    },
+    {
+      "check": "highlight toggle restores unmodified preview pixels",
+      "passed": true
+    },
+    {
+      "check": "clicking rendered alpha selects matching part and list row",
+      "passed": true
+    },
+    {
+      "check": "large character-only preview uses the same accurate picking",
+      "passed": true
+    },
+    {
+      "check": "transparent padding does not steal selection",
+      "passed": true
+    },
+    {
+      "check": "fixture has a genuinely overlapping pair for alpha picking",
+      "passed": true
+    },
+    {
+      "check": "Alt-click cycles actual overlapping visible parts",
+      "passed": true
+    },
+    {
+      "check": "hidden part remains locatable but is excluded from image hit tests",
+      "passed": true
+    },
+    {
+      "check": "reordering updates actual frontmost draw command",
+      "passed": true
+    },
+    {
+      "check": "selection outline never contaminates exported PNG pixels",
+      "passed": true
+    },
+    {
+      "check": "saved project reopens with source keyframes and template backup",
+      "passed": true
+    },
+    {
+      "check": "other action templates remain independent",
+      "passed": true
+    },
+    {
+      "check": "returning to edited action restores its primary keyframes",
+      "passed": true
+    },
+    {
+      "check": "restore returns to captured parameter template",
+      "passed": true
+    },
+    {
+      "check": "template restore is undoable",
+      "passed": true
+    },
+    {
+      "check": "mobile parts list stays accessible with no horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "scaled mobile canvas picking selects actual pixels",
+      "passed": true
+    },
+    {
+      "check": "no browser runtime errors",
+      "passed": true
+    }
+  ],
+  "page_errors": []
+}

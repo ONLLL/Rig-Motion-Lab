@@ -10,7 +10,7 @@ const labelBone={spine:'躯干',neck:'颈部',head:'头部',l_clavicle:'左肩�
  l_pelvis:'左髋连接',r_pelvis:'右髋连接',l_thigh:'左大腿',r_thigh:'右大腿',
  l_shin:'左小腿',r_shin:'右小腿',l_foot:'左脚',r_foot:'右脚'};
 const positional=['pelvis','l_wrist','r_wrist','l_ankle','r_ankle'];
-const phase=()=>S.clip?.frames[S.frame]?.phase||0;
+const phase=()=>S.previewPhase??S.clip?.frames[S.frame]?.phase??0;
 const rnd=x=>Number(x.toFixed(6));
 const phaseEqual=(a,b)=>Math.abs(a-b)<1e-6;
 const wrap=x=>Math.atan2(Math.sin(x),Math.cos(x));
@@ -47,7 +47,7 @@ async function changeAction(kind){if(E.busy||S.savePromise)return;
  if(kind==='reference'&&!S.p.reference_motion){$('motion-kind').value=S.p.motion.kind;throw Error('请先导入参考轨迹；当前动作不会被覆盖。');}
  if(kind===S.p.motion.kind)return;
  await mutate(()=>{S.p.motion_library=S.p.motion_library||{};S.p.motion_library[S.p.motion.kind]=structuredClone(S.p.motion);
- S.p.motion=structuredClone(S.p.motion_library[kind]||{...S.cfg.motion_default,kind});S.frame=0;S.clock=0;E.selected=null;});
+ S.p.motion=structuredClone(S.p.motion_library[kind]||{...S.cfg.motion_default,kind});S.frame=0;S.previewPhase=null;S.clock=0;E.selected=null;});
  toast(`已切换到${actionNames[kind]}，各动作参数与关键帧独立保存。`);}
 
 // UI additions use the same persisted project/lease as the existing workbench.
@@ -66,7 +66,7 @@ $('panel-motion').querySelector('details .help').textContent='选择时间与轨
 $('key-target').closest('label').insertAdjacentHTML('beforebegin',`<div class="two"><label>时间 / %<input id="edit-key-phase" type="number" min="0" max="100" step=".1" value="0"></label><label>到下一关键帧<select id="edit-easing"><option value="smooth">平滑</option><option value="linear">线性</option><option value="step">保持 / 阶跃</option></select></label></div>`);
 $('add-key').textContent='新增 / 更新关键帧';
 $('add-key').insertAdjacentHTML('afterend',`<div class="two editor-key-actions"><button id="edit-copy-key">复制到当前帧</button><button id="edit-delete-key" class="danger">删除选中</button></div><button id="edit-new-key" class="text-button">取消选择，编辑当前时间 →</button>`);
-$('panel-motion').insertAdjacentHTML('afterbegin',`<div class="editor-box"><strong>此动作独立保存</strong><p class="help">切换动作不清除关键帧。暂停后打开「画布调姿」，拖动手脚目标，或选择 FK 骨骼旋转。</p><label>命中时刻 / %（斩击）<input id="edit-hit-phase" type="number" min="20" max="90" step="1"></label><button id="edit-apply-hit" class="full">调整挥击时刻</button></div>`);
+$('panel-motion').insertAdjacentHTML('afterbegin',`<div class="editor-box"><strong>参数模板 · 可选叠加校正</strong><p class="help">切换动作不清除关键帧。暂停后打开「画布调姿」，拖动手脚目标，或选择 FK 骨骼旋转。</p><label>命中时刻 / %（斩击）<input id="edit-hit-phase" type="number" min="20" max="90" step="1"></label><button id="edit-apply-hit" class="full">调整挥击时刻</button></div>`);
 $('part-select').closest('label').insertAdjacentHTML('afterend',`<label>部件名称<input id="edit-part-name" maxlength="60" aria-label="部件名称"></label>`);
 $('panel-parts').insertAdjacentHTML('afterbegin',`<div class="editor-box"><h3>部件前后层级</h3><p class="help">左侧从前到后排列。拖动条目或用上下按钮调整；绑定骨骼与绘制层级是两个独立设置。</p><label>层级编辑范围<select id="edit-layer-mode"><option value="base">初始层级（全动作基准）</option><option value="key">当前动作 / 当前时刻</option></select></label>
  <div class="two"><button id="edit-front">置于最前</button><button id="edit-back">置于最后</button></div>
@@ -111,7 +111,7 @@ function drawKeys(){if(!S.p||!$('edit-lanes'))return;const filter=$('edit-track-
  else for(const u of [...new Set((S.p.motion.layer_keys||[]).map(k=>k.phase))])html+=`<button class="edit-diamond layer" data-layer-phase="${u}" style="left:${u*100}%" title="遮挡层级 ${rnd(u*100)}%">◆</button>`;
  lane.innerHTML=html;}
  buttons();updateCursor();layerKeyList();}
-function updateCursor(){if(!S.clip||!$('edit-time'))return;$('edit-time').textContent=`${S.clip.frames[S.frame].time.toFixed(2)}s · ${rnd(phase()*100)}%`;
+function updateCursor(){if(!S.clip||!$('edit-time'))return;$('edit-time').textContent=`${(phase()*S.p.motion.duration).toFixed(2)}s · ${rnd(phase()*100)}%`;
  for(const el of document.querySelectorAll('.edit-playhead'))el.style.left=(phase()*100)+'%';
  if(E.lastFrame!==S.frame){E.lastFrame=S.frame;if(!E.selected)$('edit-key-phase').value=rnd(phase()*100);if(S.tab==='parts')afterList();}}
 function layerKeyList(){if(!$('edit-layer-state')||!S.p)return;const keys=S.p.motion.layer_keys||[];
@@ -214,6 +214,6 @@ document.addEventListener('keydown',safe(async e=>{if(e.target.closest('input,se
  if(S.tab==='rig'&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)&&!e.repeat){e.preventDefault();const step=e.shiftKey?.025:.005,d={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,step],ArrowDown:[0,-step]}[e.key];await mutate(()=>moveJoint(S.p.rig,S.selectedJoint,S.p.rig.joints[S.selectedJoint].map((v,i)=>v+d[i]),$('edit-cascade').checked));}}));
 window.rigEditor={opened,saved,buttons,afterList,afterRender,tabChanged,sync,syncRig,syncPart,drawKeys,changeAction,
  // Pure transforms and state are exposed for reproducible editor regression tests.
- state:E,descendants,moveJoint,boneTransform,evaluated,effectiveLayers,selectKey,historyMove};
+ state:E,mutate,record,labelBone,closestBone,closestJoint,nearestFrame,descendants,moveJoint,boneTransform,evaluated,effectiveLayers,selectKey,historyMove};
 if(S.p)opened(S.p);
 })();

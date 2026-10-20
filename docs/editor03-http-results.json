@@ -1,0 +1,42 @@
+{
+  "method": "Actual TCP HTTP to local uvicorn",
+  "results": [
+    {
+      "check": "health HTTP 200",
+      "passed": true
+    },
+    {
+      "check": "real HTML and JavaScript served",
+      "passed": true
+    },
+    {
+      "check": "create isolated fixture",
+      "passed": true
+    },
+    {
+      "check": "full solved pose JSON and draw matrices",
+      "passed": true
+    },
+    {
+      "check": "no default contact slip",
+      "passed": true
+    },
+    {
+      "check": "real exported PNG ZIP",
+      "passed": true
+    },
+    {
+      "check": "refuses cross-origin write",
+      "passed": true
+    },
+    {
+      "check": "download/open roundtrip independent project id",
+      "passed": true
+    },
+    {
+      "check": "cannot change a different project id",
+      "passed": true
+    }
+  ],
+  "passed": 9
+}

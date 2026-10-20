@@ -147,7 +147,11 @@ def solve_project(p:Project):
     m=p.motion
     loop=m.kind in ('idle','walk')
     phases=[i/m.frames if loop else i/(m.frames-1) for i in range(m.frames)]
-    if m.kind=='reference':
+    if m.driver=='keyframes':
+        from .poseclip import pose_frame
+        frames=[pose_frame(p.rig,m,u) for u in phases]
+        source_notes=['已使用独立姿势关键帧，不再执行参数模板；FK 插值不自动锁脚，请检查接触误差。']
+    elif m.kind=='reference':
         if p.reference_motion is None: raise ValueError('请先导入参考动作 JSON 或提取视频关键点。')
         from .reference import retarget
         frames,source_notes=retarget(p,phases)

@@ -96,8 +96,40 @@ class LayerKey(Strict):
     z: int = Field(ge=-100,le=100)
     visible: bool
 
+class PoseKey(Strict):
+    """A complete editable pose, not a correction layered on a running template.
+
+    Root is an offset from bind pelvis with locomotion removed. Angles are
+    unwrapped local degrees; weapon angle is relative to the right forearm.
+    Contact targets remain in world space so FK edits cannot fake foot locks.
+    """
+    phase: float = Field(ge=0,le=1)
+    root: Vec = (0,0)
+    travel_x: float = Field(default=0,ge=-10,le=10)
+    angles: dict[str,float]
+    weapon: float = Field(ge=-7200,le=7200)
+    interpolation: Literal['smooth','linear','step'] = 'linear'
+    targets: dict[str,Vec] = Field(default_factory=dict)
+    contacts: dict[str,bool] = Field(default_factory=dict)
+    contact_ids: dict[str,int|None] = Field(default_factory=dict)
+
+    @model_validator(mode='after')
+    def valid_pose(self):
+        if set(self.angles) != set(BONES): raise ValueError('完整姿势必须包含全部标准骨骼的局部角度。')
+        if any(not math.isfinite(a) or abs(a)>7200 for a in self.angles.values()): raise ValueError('姿势角度须为 ±7200° 内的有限数值。')
+        if any(not math.isfinite(v) or abs(v)>10 for v in self.root): raise ValueError('骨盆位移超出范围。')
+        if set(self.targets)-{'l_wrist','r_wrist','l_ankle','r_ankle'}: raise ValueError('未知姿势目标。')
+        if any(not math.isfinite(v) or abs(v)>20 for p in self.targets.values() for v in p): raise ValueError('姿势目标超出范围。')
+        if set(self.contacts)-{'l','r'} or set(self.contact_ids)-{'l','r'}: raise ValueError('未知接触侧。')
+        return self
+
+
 class Motion(Strict):
     kind: Literal['idle','walk','attack','jump','reference'] = 'walk'
+    driver: Literal['template','keyframes'] = 'template'
+    pose_keys: list[PoseKey] = Field(default_factory=list,max_length=129)
+    source_motion: dict|None = None
+    link_loop_ends: bool = True
     duration: float = Field(default=1.0,ge=.3,le=10)
     frames: int = Field(default=24,ge=4,le=64)
     stride: float = Field(default=.17,ge=.02,le=.45)
@@ -116,6 +148,17 @@ class Motion(Strict):
     lock_contacts: bool = True
     @model_validator(mode='after')
     def key_times(self):
+        times=[k.phase for k in self.pose_keys]
+        if times and (len(times)<2 or times[0]!=0 or times[-1]!=1 or any(b-a<1e-6 for a,b in zip(times,times[1:]))):
+            raise ValueError('姿势关键帧须严格递增、保留 0% 与 100% 边界，间隔至少百万分之一。')
+        if self.driver=='keyframes' and not times: raise ValueError('关键帧驱动需要完整姿势。')
+        if self.driver=='keyframes' and self.keys: raise ValueError('关键帧驱动不再叠加旧校正轨道；转换时会烘焙旧轨道。')
+        if self.driver=='template' and times: raise ValueError('参数模板不能同时保存活动姿势关键帧。')
+        if self.source_motion is not None:
+            if self.source_motion.get('source_motion') is not None or self.source_motion.get('driver','template')!='template' or self.source_motion.get('pose_keys'):
+                raise ValueError('模板备份不能嵌套关键帧或其它备份。')
+            original=Motion.model_validate(self.source_motion)
+            if original.kind!=self.kind: raise ValueError('模板备份动作类型不匹配。')
         ids=[(k.phase,k.target) for k in self.keys]
         if len(set(ids))!=len(ids): raise ValueError('同一轨道同一时间只能保留一个校正点。')
         layer_ids=[(k.phase,k.part_id) for k in self.layer_keys]
