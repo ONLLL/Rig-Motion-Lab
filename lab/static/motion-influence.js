@@ -8,6 +8,7 @@
   else root.motionInfluence = api;
 })(globalThis, function () {
   'use strict';
+  const topology=typeof module==='object'&&module.exports?require('./rig-topology.js'):globalThis.rigTopology;
   const copy = x => structuredClone(x);
   const rad = x => x * Math.PI / 180;
   const deg = x => x * 180 / Math.PI;
@@ -60,7 +61,7 @@
     return envelope(phase,s,isLoop(motion));
   }
 
-  function sample(motion, u) {
+  function sample(motion, u, rig=null) {
     const keys=motion.pose_keys;
     if (!keys?.length) throw Error('请先将当前模板转换成可编辑关键帧。');
     if (u<=keys[0].phase) return {...copy(keys[0]),phase:u};
@@ -74,7 +75,7 @@
         const lerp=(x,y)=>x+(y-x)*t,k=copy(a);k.phase=u;
         k.root=a.root.map((v,j)=>lerp(v,b.root[j]));k.travel_x=lerp(a.travel_x,b.travel_x);
         k.weapon=lerp(a.weapon,b.weapon);
-        for(const n of Object.keys(a.angles))k.angles[n]=lerp(a.angles[n],b.angles[n]);
+        for(const n of new Set([...Object.keys(a.angles),...Object.keys(b.angles)])){if(rig)k.angles[n]=lerp(topology.local(a,rig,n),topology.local(b,rig,n));else if(n in a.angles&&n in b.angles)k.angles[n]=lerp(a.angles[n],b.angles[n]);}
         k.targets={};
         for(const n of new Set([...Object.keys(a.targets),...Object.keys(b.targets)])) {
           const p=a.targets[n]||b.targets[n],q=b.targets[n]||p;
@@ -87,20 +88,12 @@
   }
 
   function world(key, rig, bones) {
-    const parents={},angles={},points={pelvis:[rig.joints.pelvis[0]+key.root[0]+key.travel_x,
-      rig.joints.pelvis[1]+key.root[1]]};
-    for(const [n,[a,b]] of Object.entries(bones)) {
-      const parent=Object.keys(bones).find(p=>bones[p][1]===a);parents[n]=parent;
-      const theta=rad(key.angles[n])+(parent?angles[parent]:0);
-      const length=Math.hypot(...rig.joints[b].map((v,i)=>v-rig.joints[a][i]));
-      angles[n]=theta;points[b]=[points[a][0]+length*Math.cos(theta),points[a][1]+length*Math.sin(theta)];
-    }
-    return {points,angles,parents};
+    return topology.world(key,rig,bones);
   }
 
   function valueAt(key, target, rig, bones, rootMode) {
     if(target==='weapon') return key.weapon;
-    if(target.startsWith('bone:')) return key.angles[target.slice(5)];
+    if(target.startsWith('bone:')) return topology.local(key,rig,target.slice(5));
     const p=world(key,rig,bones).points[target];
     if(!p)throw Error('未知调姿目标。');
     return [p[0]-(rootMode==='in_place'?key.travel_x:0),p[1]];
@@ -122,9 +115,16 @@
 
   function shiftKey(key,target,delta,amount,rig,bones) {
     if(target==='weapon'){key.weapon+=delta*amount;return 0;}
-    if(target.startsWith('bone:')){key.angles[target.slice(5)]+=delta*amount;return 0;}
+    if(target.startsWith('bone:')){key.angles[target.slice(5)]=topology.local(key,rig,target.slice(5))+delta*amount;return 0;}
     if(target==='pelvis'){key.root=key.root.map((v,i)=>v+delta[i]*amount);return 0;}
     const f=world(key,rig,bones),side=target[0],leg=target.endsWith('_ankle');
+    const limb=side+(leg?'_leg':'_arm');
+    if(topology.single(rig,limb)){
+      const [root,,end]=topology.limbs[limb],a=f.points[root],old=f.points[end],goal=old.map((v,i)=>v+delta[i]*amount),dx=goal[0]-a[0],dy=goal[1]-a[1],distance=Math.hypot(dx,dy),theta=distance>1e-10?Math.atan2(dy,dx):f.angles[limb],parent=f.parents[limb];
+      key.angles[limb]=nearest(deg(theta-(parent?f.angles[parent]:0)),topology.local(key,rig,limb));
+      if(!leg||!key.contacts[side])key.targets[target]=goal;
+      return Math.abs(distance-Math.hypot(...rig.joints[end].map((v,i)=>v-rig.joints[root][i])));
+    }
     const upper=side+(leg?'_thigh':'_upper_arm'),lower=side+(leg?'_shin':'_forearm');
     const [root,middle]=bones[upper],end=bones[lower][1],a=f.points[root],old=f.points[end];
     const goal=old.map((v,i)=>v+delta[i]*amount);
@@ -154,7 +154,7 @@
 
   function apply(motion,rig,bones,request) {
     const p=plan(motion,request),target=request.target;
-    if(!['pelvis','l_wrist','r_wrist','l_ankle','r_ankle','weapon',...Object.keys(bones).map(n=>'bone:'+n)].includes(target))
+    if(!['pelvis','l_wrist','r_wrist','l_ankle','r_ankle','weapon',...Object.keys(topology.bones(rig,bones)).map(n=>'bone:'+n)].includes(target))
       throw Error('未知调姿目标。');
     const angular=target==='weapon'||target.startsWith('bone:'),delta=request.delta;
     if(angular)finite(delta,'角度变化');
@@ -165,7 +165,7 @@
       return {motion:copy(motion),summary:{...p,changed:false,affected:0,max_ik_error:0,warnings:[]}};
     if(p.inserted && motion.pose_keys.length>=129)throw Error('姿势数已达 129；请选择已有关键帧，未修改动作。');
     const result=copy(motion),warnings=[];
-    if(p.inserted){result.pose_keys.push(sample(motion,p.settings.center));result.pose_keys.sort((a,b)=>a.phase-b.phase);}
+    if(p.inserted){result.pose_keys.push(sample(motion,p.settings.center,rig));result.pose_keys.sort((a,b)=>a.phase-b.phase);}
     let residual=0;
     for(let i=0;i<result.pose_keys.length;i++) {
       const key=result.pose_keys[i],w=p.weights[i].weight;

@@ -1,0 +1,91 @@
+{
+  "fixture": "Original Pillow-drawn cartoon cutouts; no AI, no real-character artistic acceptance.",
+  "scope": "Fixed limb radius and rigid PNG transform; real character weights, cleanup, style and joint art are not validated.",
+  "motions": {
+    "idle": {
+      "max_bone_error": 1.3877787807814457e-16,
+      "max_reach_error": 0.002999793864019108,
+      "max_contact_error": 0.002999793864019108,
+      "warnings": [
+        "单段肢体整段刚性旋转；目标投影到固定长度圆周，不会自动弯肘/膝或拉长。旧中间关节、轨道及绑定保留，切回双段可恢复；旧下段角度轨道在单段模式不生效。",
+        "部分手脚目标未满足（不可达或被 FK 改写），已保持骨长并报告误差；请调整轨道、幅度或骨盆。"
+      ],
+      "baked_max_bone_error": 1.1102230246251565e-16
+    },
+    "walk": {
+      "max_bone_error": 1.3877787807814457e-16,
+      "max_reach_error": 0.08495571443935414,
+      "max_contact_error": 0.026923862207767137,
+      "warnings": [
+        "单段肢体整段刚性旋转；目标投影到固定长度圆周，不会自动弯肘/膝或拉长。旧中间关节、轨道及绑定保留，切回双段可恢复；旧下段角度轨道在单段模式不生效。",
+        "部分手脚目标未满足（不可达或被 FK 改写），已保持骨长并报告误差；请调整轨道、幅度或骨盆。"
+      ],
+      "baked_max_bone_error": 8.326672684688674e-17
+    },
+    "attack": {
+      "max_bone_error": 1.6653345369377348e-16,
+      "max_reach_error": 0.2629420858322629,
+      "max_contact_error": 0.01285704191820017,
+      "warnings": [
+        "单段肢体整段刚性旋转；目标投影到固定长度圆周，不会自动弯肘/膝或拉长。旧中间关节、轨道及绑定保留，切回双段可恢复；旧下段角度轨道在单段模式不生效。",
+        "部分手脚目标未满足（不可达或被 FK 改写），已保持骨长并报告误差；请调整轨道、幅度或骨盆。"
+      ],
+      "baked_max_bone_error": 1.1102230246251565e-16
+    }
+  },
+  "active_bones": {
+    "spine": [
+      "pelvis",
+      "chest"
+    ],
+    "neck": [
+      "chest",
+      "neck"
+    ],
+    "head": [
+      "neck",
+      "head"
+    ],
+    "l_clavicle": [
+      "chest",
+      "l_shoulder"
+    ],
+    "l_arm": [
+      "l_shoulder",
+      "l_wrist"
+    ],
+    "r_clavicle": [
+      "chest",
+      "r_shoulder"
+    ],
+    "r_arm": [
+      "r_shoulder",
+      "r_wrist"
+    ],
+    "l_pelvis": [
+      "pelvis",
+      "l_hip"
+    ],
+    "l_leg": [
+      "l_hip",
+      "l_ankle"
+    ],
+    "l_foot": [
+      "l_ankle",
+      "l_toe"
+    ],
+    "r_pelvis": [
+      "pelvis",
+      "r_hip"
+    ],
+    "r_leg": [
+      "r_hip",
+      "r_ankle"
+    ],
+    "r_foot": [
+      "r_ankle",
+      "r_toe"
+    ]
+  },
+  "artistic_review": "Contact sheet must be reviewed separately. Rigid legs cannot satisfy all walking contact targets; no perfect walk claim."
+}

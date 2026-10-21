@@ -11,7 +11,7 @@ from PIL import Image,ImageDraw,ImageChops
 from pydantic import ValidationError
 from urllib.parse import urlparse
 from . import storage,video
-from .models import Project,Rig,Part,SaveRequest,BakeRequest,CropRequest,Reference,Motion,JOINTS,BONES,LABELS
+from .models import Project,Rig,Part,SaveRequest,BakeRequest,CropRequest,Reference,Motion,JOINTS,BONES,LABELS,SINGLE_BONES,ALL_BONES
 from .demo import new_project,default_rig
 from .motion import solve_project
 from .renderer import prepare_preview,bake
@@ -49,7 +49,7 @@ def index(): return FileResponse(storage.ROOT/'lab/static/index.html')
 def health(): return {'ok':True,'version':'0.4.0','image_generation_calls':0}
 @app.get('/api/config')
 def config():
-    return {'version':'0.4.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,
+    return {'version':'0.4.0','joints':list(JOINTS),'labels':LABELS,'bones':BONES,'single_bones':SINGLE_BONES,
             'video':video.availability(),'api_keys_required':False,'editor_version':4,'motion_default':Motion().model_dump(),'scope':'Planar rig + fixed cutouts; not a trained motion generator.'}
 @app.get('/api/projects')
 def projects():
@@ -141,7 +141,7 @@ def crop(pid:str,body:CropRequest):
     im.putalpha(alpha);cut=im.crop(box);path=storage.put_image(pid,cut)
     # Initialize source anchors from annotated bone endpoints in reference image space.
     left,top,ww,hh=p.reference_placement
-    a,b=('r_wrist','r_elbow') if body.bone=='weapon' else BONES[body.bone]
+    a,b=('r_wrist','r_elbow') if body.bone=='weapon' else ALL_BONES[body.bone]
     def local(j):
         x,y=p.rig.joints[j];px=(x-left)/ww*im.width-box[0];py=(top-y)/hh*im.height-box[1]
         return (max(0,min(1,px/cut.width)),max(0,min(1,py/cut.height)))

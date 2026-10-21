@@ -9,7 +9,7 @@ const near=(a,b)=>Math.abs(a-b)<1e-6;
 const round=x=>Number(x.toFixed(6));
 const active=()=>S.p?.motion.driver==='keyframes';
 const phase=()=>S.previewPhase??S.clip?.frames[S.frame]?.phase??0;
-const parentBone=n=>Object.keys(S.cfg.bones).find(b=>S.cfg.bones[b][1]===S.cfg.bones[n][0]);
+const parentBone=n=>Object.keys(activeBones()).find(b=>activeBones()[b][1]===activeBones()[n][0]);
 const nearestAngle=(value,around)=>around+Math.atan2(Math.sin(rad(value-around)),Math.cos(rad(value-around)))*180/Math.PI;
 
 $('panel-motion').insertAdjacentHTML('afterbegin',`<section class="editor-box pose-source-box">
@@ -42,17 +42,14 @@ function sample(u,m=S.p.motion){
   const a=keys[i],b=keys[i+1];if(Math.abs(u-b.phase)<1e-12)return clone(b);
   if(a.phase<=u&&u<b.phase){let t=(u-a.phase)/(b.phase-a.phase);if(a.interpolation==='smooth')t=t*t*(3-2*t);else if(a.interpolation==='step')t=0;
    const lerp=(x,y)=>x+(y-x)*t, k=clone(a);k.phase=u;k.root=a.root.map((v,j)=>lerp(v,b.root[j]));k.travel_x=lerp(a.travel_x,b.travel_x);k.weapon=lerp(a.weapon,b.weapon);
-   for(const n of Object.keys(S.cfg.bones))k.angles[n]=lerp(a.angles[n],b.angles[n]);
+   for(const n of new Set([...Object.keys(a.angles),...Object.keys(b.angles)]))k.angles[n]=lerp(rigTopology.local(a,S.p.rig,n),rigTopology.local(b,S.p.rig,n));
    k.targets={};for(const n of new Set([...Object.keys(a.targets),...Object.keys(b.targets)])){const p=a.targets[n]||b.targets[n],q=b.targets[n]||p;k.targets[n]=n.endsWith('_ankle')&&a.contacts[n[0]]?p.slice():p.map((v,j)=>lerp(v,q[j]));}return k;
   }
  }
  throw Error('没有可采样的姿势');
 }
 function frameFromKey(k,m=S.p.motion){
- const rig=S.p.rig,pts={pelvis:[rig.joints.pelvis[0]+k.root[0]+k.travel_x,rig.joints.pelvis[1]+k.root[1]]},angles={};
- for(const [n,[a,b]] of Object.entries(S.cfg.bones)){
-  const parent=parentBone(n),theta=rad(k.angles[n])+(parent?angles[parent]:0),len=Math.hypot(rig.joints[b][0]-rig.joints[a][0],rig.joints[b][1]-rig.joints[a][1]);angles[n]=theta;pts[b]=[pts[a][0]+len*Math.cos(theta),pts[a][1]+len*Math.sin(theta)];
- }
+ const rig=S.p.rig,{points:pts,angles}=rigTopology.world(k,rig,S.cfg.bones);
  const w=angles.r_forearm+rad(k.weapon);pts.weapon_tip=[pts.r_wrist[0]+rig.weapon_length*Math.cos(w),pts.r_wrist[1]+rig.weapon_length*Math.sin(w)];
  const travel=m.root_mode==='in_place'?k.travel_x:0;
  return {phase:k.phase,time:k.phase*m.duration,joints:Object.fromEntries(Object.entries(pts).map(([n,q])=>[n,[q[0]-travel,q[1]]])),world_joints:pts,
@@ -66,7 +63,7 @@ function fillFields(force=false){if(!active())return;const f=currentFrame(),k=T.
  $('pose-x').disabled=angular;$('pose-y').disabled=angular;$('pose-angle').disabled=!angular;
  const put=(id,v)=>{if(force||document.activeElement!==$(id))$(id).value=v;};
  put('pose-time',round(phase()*100));
- if(angular)put('pose-angle',round(T.target==='weapon'?k.weapon:k.angles[T.target.slice(5)]));
+ if(angular)put('pose-angle',round(T.target==='weapon'?k.weapon:rigTopology.local(k,S.p.rig,T.target.slice(5))));
  else{const p=f.joints[T.target];if(p){put('pose-x',round(p[0]));put('pose-y',round(p[1]));}}
  const selected=S.p.motion.pose_keys.find(k=>near(k.phase,T.selected??-1));
  $('pose-selected-info').textContent=selected?`已选姿势：${round(selected.phase*100)}% · ${selected.interpolation} · ${S.p.motion.pose_keys.length} 个完整姿势`:`当前 ${round(phase()*100)}% 为插值姿势，可记录为新的关键帧。`;
@@ -80,7 +77,7 @@ function sync(){if(!S.p)return;
  $('pose-source-state').textContent=yes?'可编辑关键帧':'编辑模板动作';
  $('pose-source-note').textContent=yes?'当前动作由完整姿势关键帧驱动，参数模板已冻结；时长、采样帧数与相机仍可调整。':'先调整参数，再转换当前模板；保留当前动作的姿势，不再只编辑附加校正点。';
  for(const id of ['stride','lift','stance','amplitude','anticipation','jump-height','reference-bind','reference-gain','smoothing','lock-contacts','apply-reference'])$(id).disabled=yes;
- if(!$('pose-target').options.length){$('pose-target').innerHTML=['pelvis','r_wrist','l_wrist','r_ankle','l_ankle'].map(n=>`<option value="${n}">IK · ${esc(S.cfg.labels[n])}</option>`).join('')+Object.keys(S.cfg.bones).map(n=>`<option value="bone:${n}">${esc(rigEditor.labelBone[n])} · 局部角度</option>`).join('')+'<option value="weapon">武器 · 相对前臂角度</option>';}
+ {if(T.target.startsWith('bone:'))T.target='bone:'+rigTopology.activeBone(S.p.rig,T.target.slice(5));if(T.target.startsWith('bone:')&&!activeBones()[T.target.slice(5)])T.target='pelvis';$('pose-target').innerHTML=['pelvis','r_wrist','l_wrist','r_ankle','l_ankle'].map(n=>`<option value="${n}">IK · ${esc(S.cfg.labels[n])}</option>`).join('')+Object.keys(activeBones()).map(n=>`<option value="bone:${n}">${esc(rigEditor.labelBone[n])} · 局部角度</option>`).join('')+'<option value="weapon">武器 · 相对前臂角度</option>';}
  $('pose-target').value=T.target;
  $('pose-link-ends').checked=S.p.motion.link_loop_ends!==false;$('pose-link-ends').disabled=!['idle','walk'].includes(S.p.motion.kind);
  $('pose-count').textContent=(S.p.motion.pose_keys?.length||0)+' 个姿势 · 本地计算';
@@ -94,7 +91,7 @@ function updateKey(key){
  // walking cycle has different travel offsets and ground contact IDs at 100%.
  if(m.link_loop_ends&&['idle','walk'].includes(m.kind)&&(key.phase===0||key.phase===1)){
   const other=keys.find(k=>k.phase===1-key.phase);other.root=key.root.slice();
-  for(const n of Object.keys(key.angles))other.angles[n]=nearestAngle(key.angles[n],other.angles[n]);other.weapon=nearestAngle(key.weapon,other.weapon);
+  for(const n of Object.keys(key.angles))other.angles[n]=nearestAngle(key.angles[n],rigTopology.local(other,S.p.rig,n));other.weapon=nearestAngle(key.weapon,other.weapon);
  }
  T.selected=key.phase;
 }
@@ -105,6 +102,11 @@ function editKey(k,target,value){
  if(target.startsWith('bone:')){k.angles[target.slice(5)]=finite(value,'角度');return k;}
  const travel=S.p.motion.root_mode==='in_place'?k.travel_x:0,goal=[finite(value[0],'X')+travel,finite(value[1],'Y')];
  if(target==='pelvis'){k.root[0]+=goal[0]-f.world_joints.pelvis[0];k.root[1]+=goal[1]-f.world_joints.pelvis[1];return k;}
+ const limb=target[0]+(target.endsWith('ankle')?'_leg':'_arm');
+ if(rigTopology.single(rig,limb)){
+  const [root]=activeBones()[limb],a=f.world_joints[root],dx=goal[0]-a[0],dy=goal[1]-a[1],parent=parentBone(limb),theta=Math.hypot(dx,dy)>1e-10?Math.atan2(dy,dx):f._angles[limb];
+  k.angles[limb]=nearestAngle(deg(theta-(parent?f._angles[parent]:0)),rigTopology.local(k,rig,limb));k.targets[target]=goal;return k;
+ }
  const side=target[0],leg=target.endsWith('ankle'),upper=side+(leg?'_thigh':'_upper_arm'),lower=side+(leg?'_shin':'_forearm'),[root,middle]=S.cfg.bones[upper],end=S.cfg.bones[lower][1];
  const a=f.world_joints[root],L1=Math.hypot(...rig.joints[middle].map((v,i)=>v-rig.joints[root][i])),L2=Math.hypot(...rig.joints[end].map((v,i)=>v-rig.joints[middle][i]));
  let dx=goal[0]-a[0],dy=goal[1]-a[1],distance=Math.hypot(dx,dy);if(distance<1e-10){dx=f.world_joints[end][0]-a[0];dy=f.world_joints[end][1]-a[1];distance=Math.hypot(dx,dy)||1;}
@@ -145,10 +147,10 @@ for(const id of ['skeleton','character']){
   if(id==='character'){const ids=partSelection.hitTest(pos,f),which=e.altKey&&ids.includes(S.selectedPart)?(ids.indexOf(S.selectedPart)+1)%ids.length:0;partSelection.select(ids[which]||null);part=getPart();if(!part)return;}
   let mode=$('pose-drag-mode').value,bone,target;
   if(mode==='fk'){
-   bone=part?.bone||rigEditor.closestBone(pos,f);if(!bone)return;target=bone==='weapon'?'weapon':'bone:'+bone;
+   bone=part?rigTopology.activeBone(S.p.rig,part.bone):rigEditor.closestBone(pos,f);if(!bone)return;target=bone==='weapon'?'weapon':'bone:'+bone;
   }else{
    target=rigEditor.closestJoint(pos,['r_wrist','l_wrist','r_ankle','l_ankle','pelvis'],f);
-   if(!target&&part){const n=part.bone;if(n==='weapon'||n.includes('arm'))target=n==='weapon'?'r_wrist':n[0]+'_wrist';else if(n.includes('thigh')||n.includes('shin')||n.includes('foot'))target=n[0]+'_ankle';else if(n==='spine')target='pelvis';}
+   if(!target&&part){const n=part.bone;if(n==='weapon'||n.includes('arm'))target=n==='weapon'?'r_wrist':n[0]+'_wrist';else if(n.includes('thigh')||n.includes('shin')||n.includes('foot')||n.includes('leg'))target=n[0]+'_ankle';else if(n==='spine')target='pelvis';}
    if(!target)return;
   }
   T.target=target;$('pose-target').value=target;const w=world(pos),pivot=mode==='fk'?(bone==='weapon'?f.joints.r_wrist:f.joints[S.cfg.bones[bone][0]]):null;
@@ -158,14 +160,14 @@ for(const id of ['skeleton','character']){
  };
  canvas.onpointermove=e=>{
   const g=T.gesture;if(!g||g.canvas!==id){old.move?.(e);return;}const w=world(mouse(e,canvas));if(Math.hypot(w[0]-g.start[0],w[1]-g.start[1])<.002&&!g.moved)return;g.moved=true;g.key=clone(g.original);
-  if(g.mode==='fk'){const a=Math.atan2(w[1]-g.pivot[1],w[0]-g.pivot[0]),delta=deg(Math.atan2(Math.sin(a-g.startAngle),Math.cos(a-g.startAngle)));editKey(g.key,g.target,(g.target==='weapon'?g.original.weapon:g.original.angles[g.bone])+delta);}
+  if(g.mode==='fk'){const a=Math.atan2(w[1]-g.pivot[1],w[0]-g.pivot[0]),delta=deg(Math.atan2(Math.sin(a-g.startAngle),Math.cos(a-g.startAngle)));editKey(g.key,g.target,(g.target==='weapon'?g.original.weapon:rigTopology.local(g.original,S.p.rig,g.bone))+delta);}
   else editKey(g.key,g.target,[g.position[0]+w[0]-g.start[0],g.position[1]+w[1]-g.start[1]]);
   window.influenceEditor?.previewGesture(g,w);render();fillFields(true);
  };
  canvas.onpointerup=safe(async e=>{const g=T.gesture;if(!g||g.canvas!==id){return old.up?.(e);}T.gesture=null;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);if(g.moved){if(window.influenceEditor)await influenceEditor.commitGesture(g);else{await saveKey(g.key);toast('已修改模板姿势并保存，未调用图片 API。');}}else{render();fillFields(true);}});
  canvas.onpointercancel=e=>{if(T.gesture?.canvas===id){T.gesture=null;render();fillFields(true);}else old.cancel?.(e);};
 }
-function afterRender(f){if(!active())return;const line=$('pose-strip').querySelector('.pose-playhead');if(line)line.style.left=f.phase*100+'%';
+function afterRender(f){if(!active()||S.tab==='rig'||S.crop)return;const line=$('pose-strip').querySelector('.pose-playhead');if(line)line.style.left=f.phase*100+'%';
  $('edit-time').textContent=`${f.time.toFixed(3)}s · ${round(f.phase*100)}% [可编辑]`;
  if(T.gesture){const ctx=$('skeleton').getContext('2d');ctx.save();ctx.fillStyle='#ffd68e';ctx.font='14px sans-serif';ctx.fillText('本地姿势预览 · 松开保存',24,38);ctx.restore();}
  fillFields();window.influenceEditor?.afterRender(f);}

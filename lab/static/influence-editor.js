@@ -113,7 +113,7 @@ async function persist(ctx,target,delta,result,reapply=false) {
 }
 async function applyNumeric(target,value) {
  if(busy())return toast('正在保存或拖动，请稍候。',true);
- S.playing=false;const ctx=context(),k=M.sample(ctx.base,ctx.settings.center);
+ S.playing=false;const ctx=context(),k=M.sample(ctx.base,ctx.settings.center,ctx.rig);
  const previous=M.valueAt(k,target,ctx.rig,ctx.bones,ctx.base.root_mode);
  const delta=Array.isArray(previous)?value.map((v,i)=>v-previous[i]):value-previous;
  const result=operation(ctx,target,delta);
@@ -124,11 +124,11 @@ function beginGesture(g) {
 }
 function previewGesture(g,cursor) {
  const ctx=g.influence;if(!ctx)return;
- const delta=g.mode==='fk'?(g.target==='weapon'?g.key.weapon-g.original.weapon:g.key.angles[g.bone]-g.original.angles[g.bone]):
+ const delta=g.mode==='fk'?(g.target==='weapon'?g.key.weapon-g.original.weapon:rigTopology.local(g.key,ctx.rig,g.bone)-rigTopology.local(g.original,ctx.rig,g.bone)):
   [cursor[0]-g.start[0],cursor[1]-g.start[1]];
  try {
   const result=operation(ctx,g.target,delta);g.influenceDelta=delta;g.influenceResult=result;g.influenceError=null;
-  g.key=M.sample(result.motion,ctx.settings.center);
+  g.key=M.sample(result.motion,ctx.settings.center,ctx.rig);
  }catch(e){g.influenceError=e.message;g.key=clone(g.original);g.influenceResult=null;}
 }
 async function commitGesture(g) {

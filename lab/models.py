@@ -22,6 +22,8 @@ CHAINS = {'l_arm':('l_shoulder','l_elbow','l_wrist'),
           'r_arm':('r_shoulder','r_elbow','r_wrist'),
           'l_leg':('l_hip','l_knee','l_ankle'),
           'r_leg':('r_hip','r_knee','r_ankle')}
+SINGLE_BONES = {name:(chain[0],chain[2]) for name,chain in CHAINS.items()}
+ALL_BONES = {**BONES, **SINGLE_BONES}
 LABELS = dict(zip(JOINTS, ('骨盆','胸部','颈部','头','左肩','左肘','左腕','右肩','右肘','右腕',
                          '左髋','左膝','左踝','左脚尖','右髋','右膝','右踝','右脚尖')))
 Vec = tuple[float,float]
@@ -31,17 +33,25 @@ class Strict(BaseModel):
 
 class Rig(Strict):
     joints: dict[str,Vec]
+    limb_modes: dict[str,Literal['two','single']] = Field(default_factory=lambda:{c:'two' for c in CHAINS})
     bend: dict[str,int] = Field(default_factory=lambda:dict(l_arm=1,r_arm=-1,l_leg=1,r_leg=1))
     weapon_length: float = Field(default=.38,ge=.03,le=1.2)
     approved: bool = False
     @model_validator(mode='after')
     def validate_geometry(self):
         if set(self.joints) != set(JOINTS): raise ValueError('关节名称必须完整，不可增删标准关节。')
+        if set(self.limb_modes) != set(CHAINS): raise ValueError('需要为四条肢体分别指定骨骼模式。')
+        for chain,mode in self.limb_modes.items():
+            if mode=='single':
+                a,c=SINGLE_BONES[chain]
+                if not .008-1e-12<=math.dist(self.joints[a],self.joints[c])<=2+1e-12: raise ValueError('单段肢体连接点与末端不能重合或超长。')
         for p in self.joints.values():
             if not all(math.isfinite(v) and -3 <= v <= 3 for v in p): raise ValueError('关节坐标必须是 -3 到 3 的有限数值。')
+        hidden_segments={(a,b) for chain,(root,mid,end) in CHAINS.items() if self.limb_modes[chain]=='single' for a,b in ((root,mid),(mid,end))}
         for a,b in BONES.values():
             length=math.dist(self.joints[a],self.joints[b])
-            if not .008<=length<=2: raise ValueError(f'{a} → {b} 骨长异常；请分开连接点。')
+            minimum=1e-6 if (a,b) in hidden_segments else .008
+            if not minimum-1e-12<=length<=2+1e-12: raise ValueError(f'{a} → {b} 骨长异常；请分开连接点。')
         if set(self.bend)!=set(CHAINS) or any(v not in (-1,1) for v in self.bend.values()):
             raise ValueError('弯曲方向必须为 -1 或 1。')
         return self
@@ -60,7 +70,7 @@ class Part(Strict):
     visible: bool = True
     @model_validator(mode='after')
     def validate_part(self):
-        if self.bone not in (*BONES,'weapon'): raise ValueError('未知绑定骨骼。')
+        if self.bone not in (*ALL_BONES,'weapon'): raise ValueError('未知绑定骨骼。')
         for p in (self.anchor_a,self.anchor_b):
             if any(not 0<=v<=1 for v in p): raise ValueError('素材锚点需在图片范围内。')
         if math.dist(self.anchor_a,self.anchor_b)<.015: raise ValueError('两个素材锚点不能重合。')
@@ -82,7 +92,7 @@ class Key(Strict):
 
     @model_validator(mode='after')
     def track_target(self):
-        if self.target not in ('l_wrist','r_wrist','l_ankle','r_ankle','pelvis','weapon') and self.target not in tuple('bone:'+b for b in BONES):
+        if self.target not in ('l_wrist','r_wrist','l_ankle','r_ankle','pelvis','weapon') and self.target not in tuple('bone:'+b for b in ALL_BONES):
             raise ValueError('未知动作轨道；使用手脚目标、骨盆、武器或标准骨骼角度。')
         if self.target.startswith('bone:') or self.target == 'weapon':
             if self.dx or self.dy: raise ValueError('角度轨道不接受 X/Y 偏移。')
@@ -115,7 +125,7 @@ class PoseKey(Strict):
 
     @model_validator(mode='after')
     def valid_pose(self):
-        if set(self.angles) != set(BONES): raise ValueError('完整姿势必须包含全部标准骨骼的局部角度。')
+        if not set(BONES)<=set(self.angles) or set(self.angles)-set(ALL_BONES): raise ValueError('完整姿势必须包含全部标准骨骼的局部角度。')
         if any(not math.isfinite(a) or abs(a)>7200 for a in self.angles.values()): raise ValueError('姿势角度须为 ±7200° 内的有限数值。')
         if any(not math.isfinite(v) or abs(v)>10 for v in self.root): raise ValueError('骨盆位移超出范围。')
         if set(self.targets)-{'l_wrist','r_wrist','l_ankle','r_ankle'}: raise ValueError('未知姿势目标。')
@@ -238,6 +248,6 @@ class CropRequest(Strict):
     name: str = Field(default='拆分部件',min_length=1,max_length=60)
     @model_validator(mode='after')
     def valid(self):
-        if self.bone not in (*BONES,'weapon'): raise ValueError('未知骨骼。')
+        if self.bone not in (*ALL_BONES,'weapon'): raise ValueError('未知骨骼。')
         if any(not 0<=v<=1 for p in self.polygon for v in p): raise ValueError('选区超出原图。')
         return self

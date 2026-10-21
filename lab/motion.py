@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 import numpy as np
 from .models import Rig, Motion, Project, BONES, CHAINS, JOINTS
+from .topology import single, project_single, active_bones
 from .math2d import two_bone_ik, walking_foot, hermite
 
 
@@ -58,6 +59,9 @@ def _upper(rig:Rig,root,tilt):
 
 
 def _solve_chain(rig:Rig,points,chain,target,errors):
+    if single(rig,chain):
+        errors[chain]=project_single(rig,points,chain,target)
+        return
     a,b,c=CHAINS[chain]
     upper=math.dist(rig.joints[a],rig.joints[b]); lower=math.dist(rig.joints[b],rig.joints[c])
     result=two_bone_ik(points[a],target,upper,lower,rig.bend[chain],fallback_direction=vsub(rig.joints[c],rig.joints[a]))
@@ -126,7 +130,7 @@ def finish_frame(rig,m,u,points,targets,errors,contacts,contact_ids,root_x,weapo
     # Explicit FK corrections have priority after IK. Report broken contacts rather
     # than silently undoing the user's authored pose or claiming a successful lock.
     forearm_before=angle(points['r_elbow'],points['r_wrist'])
-    apply_fk_offsets(points, m, u, key_offset)
+    apply_fk_offsets(points, m, u, key_offset, rig)
     forearm_after=angle(points['r_elbow'],points['r_wrist'])
     weapon_angle+=math.atan2(math.sin(forearm_after-forearm_before),math.cos(forearm_after-forearm_before))
     for chain,(_,_,end) in CHAINS.items():
@@ -136,7 +140,7 @@ def finish_frame(rig,m,u,points,targets,errors,contacts,contact_ids,root_x,weapo
     if m.root_mode=='in_place':
         points={k:(v[0]-root_x,v[1]) for k,v in points.items()}
         targets={k:(v[0]-root_x,v[1]) for k,v in targets.items()}
-    bone_error=max(abs(math.dist(points[a],points[b])-math.dist(rig.joints[a],rig.joints[b])) for a,b in BONES.values())
+    bone_error=max(abs(math.dist(points[a],points[b])-math.dist(rig.joints[a],rig.joints[b])) for a,b in active_bones(rig).values())
     return {'phase':u,'time':u*m.duration,'joints':{k:list(v) for k,v in points.items()},
         'world_joints':world_points,'targets':{k:list(v) for k,v in targets.items()},
         'reach_errors':errors,'bone_error':bone_error,'contacts':contacts,'contact_ids':contact_ids,
@@ -176,6 +180,8 @@ def solve_project(p:Project):
             if old and old[0]==cid: contact_slip=max(contact_slip,math.dist(old[1],pt))
             prev_contacts[side]=(cid,pt)
     notes=list(source_notes)
+    if any(v=='single' for v in p.rig.limb_modes.values()):
+        notes.append('单段肢体整段刚性旋转；目标投影到固定长度圆周，不会自动弯肘/膝或拉长。旧中间关节、轨道及绑定保留，切回双段可恢复；旧下段角度轨道在单段模式不生效。')
     if not p.rig.approved: notes.append('骨架为待确认标注；当前仍可实验预览，导出前请确认关节。')
     if max_reach>.002: notes.append('部分手脚目标未满足（不可达或被 FK 改写），已保持骨长并报告误差；请调整轨道、幅度或骨盆。')
     if not p.parts: notes.append('尚未绑定角色部件；当前仅可查看骨架，不能导出角色素材。')

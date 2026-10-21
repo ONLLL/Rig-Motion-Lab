@@ -1,0 +1,196 @@
+{
+  "repository": "ONLLL/Rig-Motion-Lab",
+  "baseline_commit": "9767913c0fe6c2740f33067f51b645f4aa3c7a71",
+  "snapshot_has_git": false,
+  "pushed": false,
+  "scope": "Reversible single-segment cartoon rig templates; no remote AI; no source archive",
+  "manifest_excludes": [
+    "this manifest itself",
+    "venv, caches, generated data"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "status": "modified",
+      "baseline_sha256": "eb1439584fc7aea65f0a051089f122278b7f14831816f2ca0a4c46044dca5f2d",
+      "sha256": "9ff5f0a0f3be4875e34d5c370363170ded8979676db577b2f43cefb190e44b43",
+      "bytes": 14898
+    },
+    {
+      "path": "docs/CARTOON_RIG.md",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "9cfc1dae5302c9449fb1413ab8d49f1e707861a7d579434fc045640520da5860",
+      "bytes": 3863
+    },
+    {
+      "path": "docs/cartoon-dom-smoke.json",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "d70425fac244b3d43d689fc53edbdce0af0ca9a83248cef632c31ec211916a8a",
+      "bytes": 1474
+    },
+    {
+      "path": "docs/cartoon-rig-contact-sheet.png",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "19a0c15f23ade16c87e4c99fd037f01ff7436c953559f349f45c0465b4cc8dba",
+      "bytes": 28667
+    },
+    {
+      "path": "docs/cartoon-rig-tests.txt",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "e03d0f4eb8d18414b9fde52fa7c1679515a90359c073c7e225047a4d51fc723d",
+      "bytes": 352
+    },
+    {
+      "path": "docs/cartoon-rig-validation.json",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "c7d21190fa1354fbb7337c6062dcdc2737f5e4185e24a75c90dd40caf1c6efea",
+      "bytes": 2980
+    },
+    {
+      "path": "docs/cartoon-rig-walk.gif",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "26778d65304ac9bdc972aadc27a0612954fdf132c7e03829e029a43aee049841",
+      "bytes": 18825
+    },
+    {
+      "path": "lab/editing.py",
+      "status": "modified",
+      "baseline_sha256": "d7e117ae680f124e7d739f8fd9aef35f8914245ba4891894e56bf49e5515a0d3",
+      "sha256": "23def995233c2fac8dbae3a312cbd757287258936fc2d8ee5f6a493abab11f95",
+      "bytes": 5431
+    },
+    {
+      "path": "lab/main.py",
+      "status": "modified",
+      "baseline_sha256": "b7bc9ac95f6de456a5023e086c74b0e9d8c0c3cf4c65e92e080e9782455e3e3b",
+      "sha256": "94dea44a1d3d07a5695c223a9d0f5440c0219317ada18e5af110262907caa667",
+      "bytes": 15108
+    },
+    {
+      "path": "lab/models.py",
+      "status": "modified",
+      "baseline_sha256": "d70b3e86ebd3c75fa87c13b4c26f8e7cf398fd8c88796f35bc5e861d9bed31a2",
+      "sha256": "aac3214491cff2555e9172ee98b1e3921f4f2cf499e1f4b542effd39f66ad29b",
+      "bytes": 14050
+    },
+    {
+      "path": "lab/motion.py",
+      "status": "modified",
+      "baseline_sha256": "8441b29ddfab93b34ab8e771b5bacd934c6ea05fe67aad89b462b320a5062a3a",
+      "sha256": "6cd608369b4e17f0a6db771ff5dc0d2a2eb9c038f1b4277e5e42bf47002671b4",
+      "bytes": 11281
+    },
+    {
+      "path": "lab/poseclip.py",
+      "status": "modified",
+      "baseline_sha256": "633782ea25a73da54da28a3f3f7c4376568c9b693ae69f4a2353469763d08d64",
+      "sha256": "a189be21a1c8a923bb22bf4aadd69d6f319ecf1c8f414621c473349f983bcd99",
+      "bytes": 8014
+    },
+    {
+      "path": "lab/reference.py",
+      "status": "modified",
+      "baseline_sha256": "acd057c30ee9aea6da7ed0a028c5de942f5386d34c90d6addfe00dd1a699d073",
+      "sha256": "323d6ba71a5f4888aee822bd0bac664136de73b5bd7738770b447650037fda47",
+      "bytes": 5440
+    },
+    {
+      "path": "lab/renderer.py",
+      "status": "modified",
+      "baseline_sha256": "a8de8c5bfdd2350e44a60529f49dfac4bb027a0e49bde89aab140124cef659d3",
+      "sha256": "569ad1df7be78991a9e744b8c68a5d0d248f2f2496b36c8ce1e67f5c89fb804d",
+      "bytes": 6890
+    },
+    {
+      "path": "lab/static/app.js",
+      "status": "modified",
+      "baseline_sha256": "7f0d397978006d19ac10bb2765f5d822f0ec588a0fb70377b1f27e1ca2580d73",
+      "sha256": "156df5c954b8eb3aa1367ab0767668e463a8c7637acad4a6ec6d77ca873fb518",
+      "bytes": 30854
+    },
+    {
+      "path": "lab/static/editor.js",
+      "status": "modified",
+      "baseline_sha256": "2ed774f37d31b15a1af47de9a4f3912e6a0c0e08f067e92933547b278ff950fd",
+      "sha256": "6993fc81024dd5b19847105f54384ae49de1083fbc6032df2d58ad93e2ff70c9",
+      "bytes": 35312
+    },
+    {
+      "path": "lab/static/index.html",
+      "status": "modified",
+      "baseline_sha256": "0e258d8672453c843562d6d75f0fd87bc400e2c0b2905751cc38f9f1022aab67",
+      "sha256": "dd4de44ff6c3b375a152f78be289d48cc13b5b9aa3f86f7e5c8438584e221bd6",
+      "bytes": 14353
+    },
+    {
+      "path": "lab/static/influence-editor.js",
+      "status": "modified",
+      "baseline_sha256": "9147876a30edf7263fb2e3234e932c932b3a9c21643cd58917560b418bf2406c",
+      "sha256": "64119d9252fcef453876cdaa3b91cb6a171c2cd62e8b390ac506d7936395b6d9",
+      "bytes": 10333
+    },
+    {
+      "path": "lab/static/motion-influence.js",
+      "status": "modified",
+      "baseline_sha256": "a25bba8bd71ddca13ae5956429f380ae2e0d569530f2fe16ba4facfebfb4e876",
+      "sha256": "ba7e16d1252fe0ba6e1c2ca894174a99bf10ba62d15c74c369c56f55b08acfdf",
+      "bytes": 10845
+    },
+    {
+      "path": "lab/static/rig-template-ui.js",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "14ea092eb57eaea57f8c658a0efb2fe902f46bf06143723f59b10d063bf20160",
+      "bytes": 3679
+    },
+    {
+      "path": "lab/static/rig-topology.js",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "1a72f03f19f80b95335684d09ca5952919f8c5d7857055d844315519ce47b78f",
+      "bytes": 2561
+    },
+    {
+      "path": "lab/static/template-editor.js",
+      "status": "modified",
+      "baseline_sha256": "9701d055bd29bab8483e16cd91136016616309ccd5ab12e56430d58336540c04",
+      "sha256": "d1a869548ec4c723423e573982aea58fbb344ebbe45d8f9c7b3726118d50e0fa",
+      "bytes": 20997
+    },
+    {
+      "path": "lab/topology.py",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "4c252c7f32f4e2f518042374c9a52b5691508b5b8e5b2a9e81122c9b25de4335",
+      "bytes": 1675
+    },
+    {
+      "path": "tests/test_cartoon_rig.py",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "eb6b5faf284f093d595e607400c59b905ea3d633e0a099e6e431d0a57e8b2a82",
+      "bytes": 10263
+    },
+    {
+      "path": "tools/cartoon_dom_smoke.cjs",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "a6c70f0151eba2cc78a4957956e243dc03f3a8abd07aa826bb555886f75176cf",
+      "bytes": 6404
+    },
+    {
+      "path": "tools/cartoon_rig_validation.py",
+      "status": "added",
+      "baseline_sha256": null,
+      "sha256": "b76a9c7f4dcb74f8029c84860ceb2d709b17f8cba9512340447bc7f3796c0dc2",
+      "bytes": 4989
+    }
+  ],
+  "removed": []
+}

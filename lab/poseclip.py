@@ -7,7 +7,9 @@ Targets/contacts are diagnostic metadata, not claims of physical constraints.
 from __future__ import annotations
 import math
 import numpy as np
-from .models import BONES, CHAINS, Rig, Motion, PoseKey, Project
+from .models import BONES, CHAINS, SINGLE_BONES, Rig, Motion, PoseKey, Project
+
+from .topology import active_bones, single, place_single, PRIMARY
 
 PARENT_BONE = {bone: next((n for n, (_, end) in BONES.items() if end == a), None)
                for bone, (a, _) in BONES.items()}
@@ -22,9 +24,17 @@ def capture_pose(rig: Rig, frame: dict, *, root_mode: str) -> PoseKey:
                for n,q in frame['targets'].items()}
     root=(pts['pelvis'][0]-rig.joints['pelvis'][0]-travel,
           pts['pelvis'][1]-rig.joints['pelvis'][1])
+    saved_angles={n: math.degrees(a-(world_angles[PARENT_BONE[n]] if PARENT_BONE[n] else 0)) for n,a in world_angles.items()}
+    bones=active_bones(rig)
+    incoming={b:n for n,(a,b) in bones.items()}
+    for name,(a,b) in bones.items():
+        if name in SINGLE_BONES:
+            theta=math.atan2(pts[b][1]-pts[a][1],pts[b][0]-pts[a][0])
+            parent=incoming.get(a)
+            pa,pb=bones[parent] if parent else (None,None)
+            saved_angles[name]=math.degrees(theta-(math.atan2(pts[pb][1]-pts[pa][1],pts[pb][0]-pts[pa][0]) if parent else 0))
     return PoseKey(phase=frame['phase'],root=root,travel_x=travel,
-                   angles={n: math.degrees(a-(world_angles[PARENT_BONE[n]] if PARENT_BONE[n] else 0))
-                           for n,a in world_angles.items()},
+                   angles=saved_angles,
                    weapon=math.degrees(frame['weapon_angle']-world_angles['r_forearm']),
                    targets=targets,contacts=frame['contacts'],contact_ids=frame['contact_ids'])
 
@@ -44,7 +54,7 @@ def convert_to_keyframes(project: Project) -> Motion:
         frames = [template_frame(project.rig,m,u) for u in phases]
     keys = [capture_pose(project.rig,f,root_mode=m.root_mode) for f in frames]
     # Preserve the sampled poses while avoiding -180/180 discontinuities.
-    for bone in BONES:
+    for bone in keys[0].angles:
         degrees = np.degrees(np.unwrap(np.radians([k.angles[bone] for k in keys])))
         for k,a in zip(keys,degrees): k.angles[bone]=float(a)
     degrees = np.degrees(np.unwrap(np.radians([k.weapon for k in keys])))
@@ -56,7 +66,7 @@ def convert_to_keyframes(project: Project) -> Motion:
     return Motion.model_validate(data)
 
 
-def interpolate_pose(m: Motion, phase: float) -> PoseKey:
+def interpolate_pose(m: Motion, phase: float, rig: Rig | None = None) -> PoseKey:
     keys=m.pose_keys
     if not keys: raise ValueError('当前动作没有姿势关键帧。')
     u=max(0.,min(1.,phase))
@@ -77,23 +87,46 @@ def interpolate_pose(m: Motion, phase: float) -> PoseKey:
                 side=n[0]
                 planted=n.endswith('_ankle') and a.contacts.get(side,False)
                 targets[n]=p if planted else tuple(lerp(x,y) for x,y in zip(p,q))
+            names=a.angles.keys() | b.angles.keys() if rig is not None else a.angles.keys() & b.angles.keys()
+            def local(key,name):
+                if name in key.angles: return key.angles[name]
+                start,end=SINGLE_BONES[name];pa,pb=BONES[PRIMARY[name]]
+                bind=rig.joints
+                return key.angles[PRIMARY[name]]+math.degrees(math.atan2(bind[end][1]-bind[start][1],bind[end][0]-bind[start][0])-math.atan2(bind[pb][1]-bind[pa][1],bind[pb][0]-bind[pa][0]))
             return PoseKey(phase=u,root=tuple(lerp(x,y) for x,y in zip(a.root,b.root)),
-                travel_x=lerp(a.travel_x,b.travel_x),angles={n:lerp(a.angles[n],b.angles[n]) for n in BONES},
+                travel_x=lerp(a.travel_x,b.travel_x),angles={n:lerp(local(a,n),local(b,n)) for n in names},
                 weapon=lerp(a.weapon,b.weapon),interpolation=a.interpolation,targets=targets,
                 contacts=dict(a.contacts),contact_ids=dict(a.contact_ids))
     raise ValueError('关键帧范围无效。')
 
 
 def pose_frame(rig: Rig,m: Motion,phase: float) -> dict:
-    k=interpolate_pose(m,phase)
+    k=interpolate_pose(m,phase,rig)
     points={'pelvis':(rig.joints['pelvis'][0]+k.root[0]+k.travel_x,
                       rig.joints['pelvis'][1]+k.root[1])}
     angles={}
-    for name,(a,b) in BONES.items():
-        theta=math.radians(k.angles[name])+(angles[PARENT_BONE[name]] if PARENT_BONE[name] else 0)
+    bones=active_bones(rig)
+    incoming={b:n for n,(a,b) in bones.items()}
+    for name,(a,b) in bones.items():
+        parent=incoming.get(a)
+        if name not in SINGLE_BONES: parent=PARENT_BONE[name]
+        if name in SINGLE_BONES and name not in k.angles:
+            pa,pb=BONES[PRIMARY[name]]
+            rest=math.atan2(rig.joints[b][1]-rig.joints[a][1],rig.joints[b][0]-rig.joints[a][0])
+            old=math.atan2(rig.joints[pb][1]-rig.joints[pa][1],rig.joints[pb][0]-rig.joints[pa][0])
+            local=math.radians(k.angles[PRIMARY[name]])+rest-old
+        else: local=math.radians(k.angles[name])
+        theta=local+(angles[parent] if parent else 0)
         length=math.dist(rig.joints[a],rig.joints[b]);angles[name]=theta
-        points[b]=(points[a][0]+length*math.cos(theta),points[a][1]+length*math.sin(theta))
-    weapon_angle=angles['r_forearm']+math.radians(k.weapon)
+        if name in SINGLE_BONES:
+            place_single(rig,points,name,theta)
+            from .topology import SECONDARY
+            for archived in (PRIMARY[name],SECONDARY[name]):
+                x,y=BONES[archived]
+                angles[archived]=math.atan2(points[y][1]-points[x][1],points[y][0]-points[x][0])
+        else: points[b]=(points[a][0]+length*math.cos(theta),points[a][1]+length*math.sin(theta))
+    forearm=math.atan2(points['r_wrist'][1]-points['r_elbow'][1],points['r_wrist'][0]-points['r_elbow'][0])
+    weapon_angle=forearm+math.radians(k.weapon)
     points['weapon_tip']=(points['r_wrist'][0]+rig.weapon_length*math.cos(weapon_angle),
                           points['r_wrist'][1]+rig.weapon_length*math.sin(weapon_angle))
     errors={chain:math.dist(points[end],k.targets[end]) for chain,(_,_,end) in CHAINS.items() if end in k.targets}
@@ -104,4 +137,4 @@ def pose_frame(rig: Rig,m: Motion,phase: float) -> dict:
             'reach_errors':errors,'contacts':dict(k.contacts),
             'contact_ids':{s:k.contact_ids.get(s) if k.contacts.get(s) else None for s in ('l','r')},
             'root_motion':[k.travel_x,k.root[1]],'weapon_angle':weapon_angle,
-            'bone_error':max(abs(math.dist(points[a],points[b])-math.dist(rig.joints[a],rig.joints[b])) for a,b in BONES.values())}
+            'bone_error':max(abs(math.dist(points[a],points[b])-math.dist(rig.joints[a],rig.joints[b])) for a,b in active_bones(rig).values())}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import io, math, json, zipfile
 import numpy as np
 from PIL import Image,ImageDraw
-from .models import BONES,Project,Part
+from .models import ALL_BONES as BONES,Project,Part
 from .math2d import Affine
 from . import storage
 from .editing import ordered_parts

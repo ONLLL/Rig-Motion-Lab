@@ -9,18 +9,20 @@ const labelBone={spine:'躯干',neck:'颈部',head:'头部',l_clavicle:'左肩�
  l_upper_arm:'左上臂',r_upper_arm:'右上臂',l_forearm:'左前臂',r_forearm:'右前臂',
  l_pelvis:'左髋连接',r_pelvis:'右髋连接',l_thigh:'左大腿',r_thigh:'右大腿',
  l_shin:'左小腿',r_shin:'右小腿',l_foot:'左脚',r_foot:'右脚'};
+Object.assign(labelBone,{l_arm:'左整臂',r_arm:'右整臂',l_leg:'左整腿',r_leg:'右整腿'});
 const positional=['pelvis','l_wrist','r_wrist','l_ankle','r_ankle'];
 const phase=()=>S.previewPhase??S.clip?.frames[S.frame]?.phase??0;
 const rnd=x=>Number(x.toFixed(6));
 const phaseEqual=(a,b)=>Math.abs(a-b)<1e-6;
 const wrap=x=>Math.atan2(Math.sin(x),Math.cos(x));
 const trackLabel=t=>t.startsWith('bone:')?'FK · '+(labelBone[t.slice(5)]||t):t==='weapon'?'武器角度':S.cfg?.labels[t]||t;
-function descendants(j){const names=[j];for(let i=0;i<names.length;i++)for(const [a,b] of Object.values(S.cfg.bones))if(a===names[i])names.push(b);return names;}
+function descendants(j){const names=[j];for(let i=0;i<names.length;i++)for(const [a,b] of Object.values(activeBones()))if(a===names[i]&&!names.includes(b))names.push(b);for(const[n,v]of Object.entries(rigTopology.limbs))if(rigTopology.single(S.p.rig,n)&&names.includes(v[0])&&!names.includes(v[1]))names.push(v[1]);return names;}
 function rotate(p,o,a){const c=Math.cos(a),s=Math.sin(a),x=p[0]-o[0],y=p[1]-o[1];return [o[0]+c*x-s*y,o[1]+s*x+c*y];}
-function moveJoint(rig,j,to,cascade){const old=rig.joints[j],d=[to[0]-old[0],to[1]-old[1]];for(const n of cascade?descendants(j):[j])rig.joints[n]=rig.joints[n].map((v,i)=>v+d[i]);rig.approved=false;}
-function boneTransform(rig,bone,length,degrees,cascade){const [a,b]=S.cfg.bones[bone],origin=rig.joints[a],old=rig.joints[b],theta=degrees*Math.PI/180;
+function preserveSingleBind(rig,before){for(const[n,[a,b,c]]of Object.entries(rigTopology.limbs)){if(!rigTopology.single(rig,n))continue;const oa=before[a],oc=before[c],na=rig.joints[a],nc=rig.joints[c];if(oa.every((v,i)=>v===na[i])&&oc.every((v,i)=>v===nc[i]))continue;const oldLength=Math.hypot(oc[0]-oa[0],oc[1]-oa[1]),newLength=Math.hypot(nc[0]-na[0],nc[1]-na[1]);if(oldLength<1e-10||newLength<1e-10)continue;const delta=Math.atan2(nc[1]-na[1],nc[0]-na[0])-Math.atan2(oc[1]-oa[1],oc[0]-oa[0]),q=rotate(before[b],oa,delta),scale=newLength/oldLength;rig.joints[b]=q.map((v,i)=>na[i]+(v-oa[i])*scale);}}
+function moveJoint(rig,j,to,cascade){const before=structuredClone(rig.joints),old=rig.joints[j],d=[to[0]-old[0],to[1]-old[1]];for(const n of cascade?descendants(j):[j])rig.joints[n]=rig.joints[n].map((v,i)=>v+d[i]);preserveSingleBind(rig,before);rig.approved=false;}
+function boneTransform(rig,bone,length,degrees,cascade){const before=structuredClone(rig.joints),[a,b]=S.cfg.bones[bone],origin=rig.joints[a],old=rig.joints[b],theta=degrees*Math.PI/180;
  const end=[origin[0]+length*Math.cos(theta),origin[1]+length*Math.sin(theta)],delta=theta-Math.atan2(old[1]-origin[1],old[0]-origin[0]);
- for(const n of cascade?descendants(b):[b]){const q=rotate(rig.joints[n],old,delta);rig.joints[n]=[q[0]+end[0]-old[0],q[1]+end[1]-old[1]];}rig.approved=false;}
+ for(const n of cascade?descendants(b):[b]){const q=rotate(rig.joints[n],old,delta);rig.joints[n]=[q[0]+end[0]-old[0],q[1]+end[1]-old[1]];}preserveSingleBind(rig,before);rig.approved=false;}
 function evaluated(target,u,m=S.p.motion){const keys=m.keys.filter(k=>k.target===target).sort((a,b)=>a.phase-b.phase).map(k=>({...k}));
  if(!keys.length)return [0,0,0];if(keys[0].phase>0)keys.unshift({phase:0,dx:0,dy:0,angle:0,interpolation:'smooth'});if(keys.at(-1).phase<1)keys.push({phase:1,dx:0,dy:0,angle:0});
  if(u<=keys[0].phase)return [keys[0].dx,keys[0].dy,keys[0].angle];
@@ -59,7 +61,7 @@ $('panel-rig').querySelector('#approve-rig').insertAdjacentHTML('beforebegin',`
  <label>画布操作<select id="edit-rest-mode"><option value="move">移动关节</option><option value="rotate">旋转选中骨骼（拖动末端）</option></select></label>
  <button id="edit-apply-bone" class="full">应用骨长与角度</button>
  <label>武器长度<input id="edit-weapon-length" type="number" min=".03" max="1.2" step=".01"></label><button id="edit-apply-weapon" class="full">应用武器长度</button>
- <p class="help">修改的是初始结构，不是某一帧。模板仍使用固定双足拓扑，暂不增删／重挂语义关节；修改后须重新确认骨架。</p></div>`);
+ <p class="help">修改的是初始结构，不是某一帧。可选择单段或双段四肢；修改后须重新确认骨架。</p></div>`);
 $('panel-motion').querySelector('details').open=true;
 $('panel-motion').querySelector('details summary').textContent='关键帧编辑 · IK / FK';
 $('panel-motion').querySelector('details .help').textContent='选择时间与轨道，修改已有关键帧或新增。FK 角度在 IK 后应用，可能改变脚部接触；具体误差会重新计算。';
@@ -78,13 +80,17 @@ $('timeline').closest('.playback').insertAdjacentHTML('afterend',`
  <div id="edit-lanes"><div class="edit-lane"><span>IK 位置</span><div data-lane="ik" class="edit-strip"></div></div><div class="edit-lane"><span>FK 角度</span><div data-lane="fk" class="edit-strip"></div></div><div class="edit-lane"><span>遮挡层级</span><div data-lane="layer" class="edit-strip"></div></div></div>
  <p class="help">点击菱形选中，拖动调整时间；在右侧编辑数值、插值或删除。帧间渲染只采样曲线，不产生图片 API 请求。</p></section>`);
 function sync(){if(!S.p||!S.cfg)return;
- const boneOptions=Object.keys(S.cfg.bones).map(b=>`<option value="${b}">${esc(labelBone[b]||b)}</option>`).join('');
- if(!$('edit-bone').options.length){$('edit-bone').innerHTML=boneOptions;$('key-target').insertAdjacentHTML('beforeend',Object.keys(S.cfg.bones).map(b=>`<option value="bone:${b}">FK · ${esc(labelBone[b]||b)}</option>`).join(''));
- $('edit-track-filter').insertAdjacentHTML('beforeend',[...positional,'weapon',...Object.keys(S.cfg.bones).map(b=>'bone:'+b)].map(t=>`<option value="${t}">${esc(trackLabel(t))}</option>`).join(''));}
+ const current=$('key-target').value,filter=$('edit-track-filter').value;
+ $('edit-bone').innerHTML=Object.keys(activeBones()).map(b=>`<option value="${b}">${esc(labelBone[b]||b)}</option>`).join('');
+ const tracks=[...positional,'weapon',...Object.keys(activeBones()).map(b=>'bone:'+b)];
+ for(const k of S.p.motion.keys)if(!tracks.includes(k.target))tracks.push(k.target);
+ $('key-target').innerHTML=tracks.map(t=>`<option value="${t}">${esc(trackLabel(t))}${t.startsWith('bone:')&&!activeBones()[t.slice(5)]?'（保留轨道）':''}</option>`).join('');
+ $('key-target').value=tracks.includes(current)?current:'r_wrist';
+ $('edit-track-filter').innerHTML='<option value="all">全部轨道</option>'+tracks.map(t=>`<option value="${t}">${esc(trackLabel(t))}</option>`).join('');$('edit-track-filter').value=filter||'all';
  $('edit-hit-phase').value=rnd(S.p.motion.hit_phase*100);$('edit-hit-phase').disabled=S.p.motion.kind!=='attack';$('edit-apply-hit').disabled=S.p.motion.kind!=='attack';
  syncRig();syncPart();drawKeys();updateFields();buttons();}
-function syncRig(){if(!S.p||!$('edit-bone'))return;const incoming=Object.entries(S.cfg.bones).find(([,ab])=>ab[1]===S.selectedJoint);
- if(incoming)E.bone=incoming[0];$('edit-bone').value=E.bone;const [a,b]=S.cfg.bones[E.bone],p=S.p.rig.joints[a],q=S.p.rig.joints[b];
+function syncRig(){if(!S.p||!$('edit-bone'))return;const incoming=Object.entries(activeBones()).find(([,ab])=>ab[1]===S.selectedJoint);
+ if(incoming)E.bone=incoming[0];if(!activeBones()[E.bone])E.bone=rigTopology.activeBone(S.p.rig,E.bone);if(!activeBones()[E.bone])E.bone='spine';$('edit-bone').value=E.bone;const [a,b]=S.cfg.bones[E.bone],p=S.p.rig.joints[a],q=S.p.rig.joints[b];
  $('edit-length').value=Math.hypot(q[0]-p[0],q[1]-p[1]).toFixed(5);$('edit-bind-angle').value=(Math.atan2(q[1]-p[1],q[0]-p[0])*180/Math.PI).toFixed(2);
  $('edit-parent').textContent=`${S.cfg.labels[a]} → ${S.cfg.labels[b]} · ${E.bone}`;$('edit-weapon-length').value=S.p.rig.weapon_length;}
 function syncPart(){const p=getPart();if(!p||!$('edit-part-name'))return;$('edit-part-name').value=p.name;
@@ -92,7 +98,7 @@ function syncPart(){const p=getPart();if(!p||!$('edit-part-name'))return;$('edit
 function updateFields(){const angular=$('key-target').value.startsWith('bone:')||$('key-target').value==='weapon';$('key-x').disabled=angular;$('key-y').disabled=angular;$('key-angle').disabled=!angular;}
 function selectKey(index){const k=S.p.motion.keys[index];if(!k)return;E.selected={phase:k.phase,target:k.target};S.playing=false;S.clock=0;S.frame=nearestFrame(k.phase);
  $('key-target').value=k.target;$('edit-key-phase').value=rnd(k.phase*100);$('key-x').value=k.dx;$('key-y').value=k.dy;$('key-angle').value=k.angle;$('edit-easing').value=k.interpolation||'smooth';
- if(k.target.startsWith('bone:')){E.bone=k.target.slice(5);S.selectedJoint=S.cfg.bones[E.bone][1];}
+ if(k.target.startsWith('bone:')){E.bone=rigTopology.activeBone(S.p.rig,k.target.slice(5));if(!activeBones()[E.bone])E.bone='spine';S.selectedJoint=S.cfg.bones[E.bone][1];}
  $('panel-motion').querySelector('details').open=true;updateFields();drawKeys();render();}
 function nearestFrame(u){return S.clip.frames.reduce((best,f,i)=>Math.abs(f.phase-u)<Math.abs(S.clip.frames[best].phase-u)?i:best,0);}
 function keyFromFields(){const t=$('key-target').value,angular=t.startsWith('bone:')||t==='weapon';return {phase:rnd(num('edit-key-phase')/100),target:t,dx:angular?0:num('key-x'),dy:angular?0:num('key-y'),angle:angular?num('key-angle'):0,interpolation:$('edit-easing').value};}
@@ -119,8 +125,8 @@ function layerKeyList(){if(!$('edit-layer-state')||!S.p)return;const keys=S.p.mo
  const phases=[...new Set(keys.map(k=>k.phase))].sort((a,b)=>a-b);
  $('edit-layer-keys').innerHTML=phases.map(u=>`<div class="layer-key-row"><button data-layer-seek="${u}">${rnd(u*100)}% · ${keys.filter(k=>k.phase===u).length} 件</button><button data-layer-delete="${u}" aria-label="删除这一时刻的层级记录">×</button></div>`).join('');}
 function afterList(){if(!S.p)return;
- if(S.tab==='rig'){const parent=Object.fromEntries(Object.values(S.cfg.bones).map(([a,b])=>[b,a]));const depth=j=>parent[j]?1+depth(parent[j]):0;
- $('list-title').textContent='骨骼结构 · 固定拓扑';$('side-list').innerHTML=descendants('pelvis').map(j=>`<button class="side-item rig-tree-item ${S.selectedJoint===j?'active':''}" data-joint="${j}" style="padding-left:${5+depth(j)*8}px"><span>${depth(j)?'└ ':''}${esc(S.cfg.labels[j])}</span><small>${depth(j)?'子关节':'根'}</small></button>`).join('');return;}
+ if(S.tab==='rig'){const parent=Object.fromEntries(Object.values(activeBones()).map(([a,b])=>[b,a]));const depth=j=>parent[j]?1+depth(parent[j]):0;
+ $('list-title').textContent='骨骼结构 · '+activeJoints().length+' 个活动关节';$('side-list').innerHTML=descendants('pelvis').filter(j=>activeJoints().includes(j)).map(j=>`<button class="side-item rig-tree-item ${S.selectedJoint===j?'active':''}" data-joint="${j}" style="padding-left:${5+depth(j)*8}px"><span>${depth(j)?'└ ':''}${esc(S.cfg.labels[j])}</span><small>${depth(j)?'子关节':'根'}</small></button>`).join('');return;}
  if(S.tab!=='parts')return;$('list-title').textContent='部件层级 · 前 → 后';
  const rows=E.layerMode==='key'?effectiveLayers():S.p.parts.map((p,i)=>({...p,_index:i})).sort((a,b)=>b.z-a.z||b._index-a._index);
  $('side-list').innerHTML=rows.map((p,i)=>`<div class="layer-row ${p.id===S.selectedPart?'active':''}" data-layer-id="${esc(p.id)}" draggable="true"><button data-layer-toggle="${esc(p.id)}" class="layer-eye" aria-label="${p.visible?'隐藏':'显示'} ${esc(p.name)}">${p.visible?'●':'○'}</button><button data-part="${esc(p.id)}" class="layer-name"><span>${esc(p.name)}</span><small>${esc(p.bone==='weapon'?'右腕 → 武器':labelBone[p.bone]||p.bone)} · z ${p.z}</small></button><div><button data-layer-up="${esc(p.id)}" aria-label="上移 ${esc(p.name)}" ${i===0?'disabled':''}>↑</button><button data-layer-down="${esc(p.id)}" aria-label="下移 ${esc(p.name)}" ${i===rows.length-1?'disabled':''}>↓</button></div></div>`).join('')||'<p class="help">先上传或拆分角色部件。</p>';}
@@ -177,10 +183,10 @@ $('edit-lanes').onpointercancel=()=>{keyDrag=null;drawKeys();};
 
 const oldPointerDown=$('skeleton').onpointerdown;
 function closestJoint(pos,names,frame){let best=null,dist=24;for(const name of names){const q=point(frame.joints[name]),d=Math.hypot(pos[0]-q[0],pos[1]-q[1]);if(d<dist){best=name;dist=d;}}return best;}
-function closestBone(pos,frame){let best=null,dist=18;for(const [name,[a,b]] of Object.entries(S.cfg.bones)){const p=point(frame.joints[a]),q=point(frame.joints[b]),dx=q[0]-p[0],dy=q[1]-p[1],v=Math.max(0,Math.min(1,((pos[0]-p[0])*dx+(pos[1]-p[1])*dy)/(dx*dx+dy*dy)));const d=Math.hypot(pos[0]-p[0]-v*dx,pos[1]-p[1]-v*dy);if(d<dist){best=name;dist=d;}}return best;}
+function closestBone(pos,frame){let best=null,dist=18;for(const [name,[a,b]] of Object.entries(activeBones())){const p=point(frame.joints[a]),q=point(frame.joints[b]),dx=q[0]-p[0],dy=q[1]-p[1],v=Math.max(0,Math.min(1,((pos[0]-p[0])*dx+(pos[1]-p[1])*dy)/(dx*dx+dy*dy)));const d=Math.hypot(pos[0]-p[0]-v*dx,pos[1]-p[1]-v*dy);if(d<dist){best=name;dist=d;}}return best;}
 $('skeleton').onpointerdown=e=>{if(!S.p||E.busy||S.savePromise)return;if(S.crop){oldPointerDown(e);return;}const pos=mouse(e,$('skeleton')),frame=currentFrame();
  if(S.tab==='rig'){
-   let joint=closestJoint(pos,S.cfg.joints,frame);const bone=closestBone(pos,frame);if(E.restMode==='rotate'&&bone){E.bone=bone;joint=S.cfg.bones[bone][1];}
+   let joint=closestJoint(pos,activeJoints(),frame);const bone=closestBone(pos,frame);if(E.restMode==='rotate'&&bone){E.bone=bone;joint=S.cfg.bones[bone][1];}
    if(!joint){if(bone){E.bone=bone;S.selectedJoint=S.cfg.bones[bone][1];syncJoint();render();}return;}
    S.selectedJoint=joint;syncJoint();list();E.gesture={kind:E.restMode==='rotate'?'bind-rotate':'bind-move',joint,bone:E.bone,start:world(pos),rig:structuredClone(S.p.rig),dirty:S.dirty};
  }else if((S.tab==='motion'||S.tab==='reference')&&$('edit-autokey').checked){

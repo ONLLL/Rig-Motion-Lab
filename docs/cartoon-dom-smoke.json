@@ -1,0 +1,63 @@
+{
+  "scope": "jsdom event/data logic; mocked Canvas; Python schema + solver validated each save. Not actual browser visual QA.",
+  "checks": [
+    "all scripts boot",
+    "cartoon click applies single arms",
+    "elbows absent from active joint list",
+    "existing baked keys retained without alias conversion",
+    "alias field loads legacy angle",
+    "alias numeric update saved",
+    "linked loop aliases equal",
+    "all serialized key angles finite",
+    "backend validation and solve succeeded",
+    "switch back restores standard topology without deleting archived angles",
+    "no script runtime errors"
+  ],
+  "requests": [
+    [
+      "GET",
+      "/api/config"
+    ],
+    [
+      "GET",
+      "/api/projects"
+    ],
+    [
+      "GET",
+      "/api/projects/dddddddddddddddddddddddddddddddd"
+    ],
+    [
+      "POST",
+      "/api/projects/dddddddddddddddddddddddddddddddd/solve"
+    ],
+    [
+      "GET",
+      "/api/projects"
+    ],
+    [
+      "PUT",
+      "/api/projects/dddddddddddddddddddddddddddddddd"
+    ],
+    [
+      "POST",
+      "/api/projects/dddddddddddddddddddddddddddddddd/solve"
+    ],
+    [
+      "PUT",
+      "/api/projects/dddddddddddddddddddddddddddddddd"
+    ],
+    [
+      "POST",
+      "/api/projects/dddddddddddddddddddddddddddddddd/solve"
+    ],
+    [
+      "PUT",
+      "/api/projects/dddddddddddddddddddddddddddddddd"
+    ],
+    [
+      "POST",
+      "/api/projects/dddddddddddddddddddddddddddddddd/solve"
+    ]
+  ],
+  "errors": []
+}
